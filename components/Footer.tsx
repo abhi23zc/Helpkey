@@ -10,7 +10,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <h3 className="text-2xl font-bold mb-4" style={{ fontFamily: 'Pacifico, serif' }}>
-              StayBook
+              Helpkey
             </h3>
             <p className="text-gray-400">
               Your trusted partner for finding the perfect accommodation worldwide.
@@ -84,7 +84,7 @@ export default function Footer() {
               </p>
               <p className="text-gray-400 flex items-center">
                 <i className="ri-mail-line mr-2 w-4 h-4 flex items-center justify-center"></i>
-                info@staybook.com
+                info@Helpkey.com
               </p>
               <p className="text-gray-400 flex items-center">
                 <i className="ri-map-pin-line mr-2 w-4 h-4 flex items-center justify-center"></i>
@@ -96,7 +96,7 @@ export default function Footer() {
 
         <div className="border-t border-gray-800 mt-8 pt-8 text-center">
           <p className="text-gray-400">
-            © 2024 StayBook. All rights reserved.
+            © 2024 Helpkey. All rights reserved.
           </p>
         </div>
       </div>

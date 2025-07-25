@@ -49,7 +49,7 @@ export default function Contact() {
     {
       icon: "ri-mail-line",
       title: "Email",
-      info: "support@staybook.com",
+      info: "support@Helpkey.com",
       subtitle: "We reply within 24 hours"
     },
     {
@@ -248,7 +248,7 @@ export default function Contact() {
                 allowFullScreen
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
-                title="StayBook Office Location"
+                title="Helpkey Office Location"
               ></iframe>
             </div>
           </div>

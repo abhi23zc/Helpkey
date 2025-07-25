@@ -53,7 +53,7 @@ export default function About() {
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center text-white max-w-4xl mx-auto px-4">
             <h1 className="text-5xl md:text-6xl font-bold mb-4">
-              About StayBook
+              About Helpkey
             </h1>
             <p className="text-xl md:text-2xl mb-8 max-w-2xl mx-auto">
               We're passionate about making travel accessible, affordable, and unforgettable for everyone
@@ -132,7 +132,7 @@ export default function About() {
               <h2 className="text-4xl font-bold text-gray-900 mb-6">Our Story</h2>
               <div className="space-y-4 text-gray-600">
                 <p>
-                  StayBook was founded in 2009 by a group of travel enthusiasts who experienced firsthand the challenges of finding reliable, affordable accommodations while exploring the world. We noticed a gap in the market for a platform that truly understood travelers' needs.
+                  Helpkey was founded in 2009 by a group of travel enthusiasts who experienced firsthand the challenges of finding reliable, affordable accommodations while exploring the world. We noticed a gap in the market for a platform that truly understood travelers' needs.
                 </p>
                 <p>
                   Starting with just 100 hotels in 5 countries, we've grown to become one of the world's leading hotel booking platforms. Our success is built on three core principles: transparency, reliability, and exceptional customer service.
@@ -159,7 +159,7 @@ export default function About() {
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Meet Our Team</h2>
             <p className="text-xl text-gray-600">
-              The passionate people behind StayBook's success
+              The passionate people behind Helpkey's success
             </p>
           </div>
 

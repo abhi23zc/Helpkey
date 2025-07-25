@@ -37,7 +37,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Why Choose StayBook?
+              Why Choose Helpkey?
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
               We make hotel booking simple, secure, and rewarding
@@ -155,7 +155,7 @@ export default function Home() {
             Ready to Start Your Journey?
           </h2>
           <p className="text-xl text-blue-100 mb-8">
-            Join millions of travelers who trust StayBook for their perfect stay
+            Join millions of travelers who trust Helpkey for their perfect stay
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors whitespace-nowrap cursor-pointer">
