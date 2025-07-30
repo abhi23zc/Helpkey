@@ -2,10 +2,19 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { db } from '@/config/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AddHotel() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     location: '',
@@ -88,10 +97,71 @@ export default function AddHotel() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Hotel Data:', formData);
-    alert('Hotel added successfully!');
+    setError('');
+    
+    // Validate required fields
+    const requiredFields = [
+      { field: formData.name, message: 'Hotel name is required' },
+      { field: formData.location, message: 'Location is required' },
+      { field: formData.address, message: 'Address is required' },
+      { field: formData.phone, message: 'Phone number is required' },
+      { field: formData.email, message: 'Email is required' },
+      { field: formData.description, message: 'Description is required' }
+    ];
+    
+    for (const { field, message } of requiredFields) {
+      if (!field.trim()) {
+        setError(message);
+        return;
+      }
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Check if user is authenticated
+      if (!user) {
+        setError('You must be logged in to add a hotel');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Add hotel data to Firestore
+      const hotelData = {
+        ...formData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        status: 'active',
+        addedAt: new Date().toISOString(),
+        approved: false,
+        hotelAdmin: user.uid // Add the user's UID as hotelAdmin
+      };
+      
+      // Add document to 'hotels' collection
+      const docRef = await addDoc(collection(db, 'hotels'), hotelData);
+      console.log('Hotel added with ID:', docRef.id);
+      
+      // Show success message
+      setShowSuccess(true);
+      
+      // Redirect after a short delay
+      setTimeout(() => {
+        router.push('/admin/hotels');
+      }, 2000);
+    } catch (error: any) {
+      console.error('Error adding hotel:', error);
+      setError(error.message || 'Error adding hotel. Please try again.');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -110,7 +180,34 @@ export default function AddHotel() {
           </Link>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
+        {showSuccess ? (
+          <div className="bg-green-50 border-l-4 border-green-500 p-6 mb-4 text-center">
+            <div className="flex flex-col items-center justify-center">
+              <div className="flex-shrink-0 mb-4">
+                <svg className="h-12 w-12 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-green-800 mb-2">Hotel Added Successfully!</h3>
+              <p className="text-green-700">Redirecting to hotel management page...</p>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           {/* Basic Information */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-semibold mb-6">Basic Information</h2>
@@ -378,12 +475,22 @@ export default function AddHotel() {
             </Link>
             <button
               type="submit"
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap"
+              disabled={isSubmitting}
+              className={`${isSubmitting ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'} text-white px-6 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center`}
             >
-              Create Hotel
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Saving...
+                </>
+              ) : 'Create Hotel'}
             </button>
           </div>
         </form>
+        )}
       </div>
 
       <Footer />
