@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "export",
   images: {
-    unoptimized: true,
+    unoptimized: true, // optional, remove this if you want Next.js image optimization
   },
   typescript: {
     // ignoreBuildErrors: true,

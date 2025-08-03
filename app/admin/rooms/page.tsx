@@ -1,109 +1,52 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { db } from '@/config/firebase';
+import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 export default function RoomManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHotel, setSelectedHotel] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [hotels, setHotels] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const hotels = [
-    { id: 1, name: "Grand Luxury Resort" },
-    { id: 2, name: "City Center Business Hotel" },
-    { id: 3, name: "Boutique Garden Hotel" },
-    { id: 4, name: "Mountain View Lodge" },
-    { id: 5, name: "Seaside Resort & Spa" }
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const hotelsSnapshot = await getDocs(collection(db, 'hotels'));
+        const hotelsData = hotelsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setHotels(hotelsData);
 
-  const rooms = [
-    {
-      id: 1,
-      hotelId: 1,
-      hotelName: "Grand Luxury Resort",
-      roomType: "Ocean View Suite",
-      roomNumber: "101",
-      price: 399,
-      size: "650 sq ft",
-      beds: "1 King Bed",
-      capacity: 2,
-      status: "Available",
-      amenities: ["Ocean View", "Balcony", "Mini Bar", "Marble Bathroom"],
-      image: "https://readdy.ai/api/search-image?query=Luxury%20hotel%20ocean%20view%20suite%20with%20king%20bed%2C%20elegant%20decor%2C%20private%20balcony%2C%20marble%20bathroom%2C%20sophisticated%20furnishings%2C%20five%20star%20accommodation%2C%20stunning%20sea%20views&width=400&height=300&seq=admin-room-1&orientation=landscape"
-    },
-    {
-      id: 2,
-      hotelId: 1,
-      hotelName: "Grand Luxury Resort",
-      roomType: "Beachfront Villa",
-      roomNumber: "201",
-      price: 599,
-      size: "1200 sq ft",
-      beds: "2 Queen Beds",
-      capacity: 4,
-      status: "Occupied",
-      amenities: ["Private Beach Access", "Outdoor Shower", "Kitchenette", "Terrace"],
-      image: "https://readdy.ai/api/search-image?query=Beachfront%20villa%20with%20private%20terrace%2C%20outdoor%20shower%2C%20luxury%20furnishings%2C%20direct%20beach%20access%2C%20tropical%20paradise%2C%20premium%20accommodation%2C%20elegant%20design&width=400&height=300&seq=admin-room-2&orientation=landscape"
-    },
-    {
-      id: 3,
-      hotelId: 2,
-      hotelName: "City Center Business Hotel",
-      roomType: "Executive Suite",
-      roomNumber: "301",
-      price: 289,
-      size: "800 sq ft",
-      beds: "1 King Bed",
-      capacity: 2,
-      status: "Available",
-      amenities: ["City View", "Work Area", "Executive Lounge Access", "Premium WiFi"],
-      image: "https://readdy.ai/api/search-image?query=Executive%20hotel%20suite%20with%20city%20skyline%20views%2C%20modern%20business%20desk%2C%20king%20bed%2C%20sophisticated%20urban%20decor%2C%20professional%20atmosphere%2C%20luxury%20amenities&width=400&height=300&seq=admin-room-3&orientation=landscape"
-    },
-    {
-      id: 4,
-      hotelId: 2,
-      hotelName: "City Center Business Hotel",
-      roomType: "Business Room",
-      roomNumber: "401",
-      price: 189,
-      size: "400 sq ft",
-      beds: "1 Queen Bed",
-      capacity: 2,
-      status: "Maintenance",
-      amenities: ["Work Desk", "Ergonomic Chair", "High-Speed Internet", "City View"],
-      image: "https://readdy.ai/api/search-image?query=Modern%20business%20hotel%20room%20with%20work%20desk%2C%20queen%20bed%2C%20city%20views%2C%20professional%20decor%2C%20ergonomic%20furniture%2C%20business%20traveler%20amenities&width=400&height=300&seq=admin-room-4&orientation=landscape"
-    },
-    {
-      id: 5,
-      hotelId: 3,
-      hotelName: "Boutique Garden Hotel",
-      roomType: "Garden Suite",
-      roomNumber: "501",
-      price: 225,
-      size: "550 sq ft",
-      beds: "1 King Bed",
-      capacity: 2,
-      status: "Available",
-      amenities: ["Garden View", "Fireplace", "Jacuzzi", "Private Patio"],
-      image: "https://readdy.ai/api/search-image?query=Elegant%20boutique%20hotel%20garden%20suite%20with%20king%20bed%2C%20romantic%20decor%2C%20garden%20views%2C%20luxurious%20furnishings%2C%20intimate%20atmosphere%2C%20sophisticated%20design&width=400&height=300&seq=admin-room-5&orientation=landscape"
-    },
-    {
-      id: 6,
-      hotelId: 4,
-      hotelName: "Mountain View Lodge",
-      roomType: "Mountain View Room",
-      roomNumber: "601",
-      price: 149,
-      size: "350 sq ft",
-      beds: "1 Queen Bed",
-      capacity: 2,
-      status: "Available",
-      amenities: ["Mountain View", "Fireplace", "Ski Storage", "Hot Tub Access"],
-      image: "https://readdy.ai/api/search-image?query=Mountain%20lodge%20room%20with%20stunning%20mountain%20views%2C%20rustic%20luxury%20decor%2C%20fireplace%2C%20cozy%20atmosphere%2C%20ski%20resort%20accommodation%2C%20natural%20wood%20furnishings&width=400&height=300&seq=admin-room-6&orientation=landscape"
+        const roomsSnapshot = await getDocs(collection(db, 'rooms'));
+        const roomsData = roomsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setRooms(roomsData);
+      } catch (error) {
+        console.error("Error fetching data: ", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleDelete = async (roomId) => {
+    if (window.confirm('Are you sure you want to delete this room?')) {
+      try {
+        await deleteDoc(doc(db, 'rooms', roomId));
+        setRooms(rooms.filter(room => room.id !== roomId));
+      } catch (error) {
+        console.error('Error deleting room: ', error);
+        alert('Failed to delete room.');
+      }
     }
-  ];
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -253,90 +196,42 @@ export default function RoomManagement() {
         {/* Rooms Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredRooms.map(room => (
-            <div key={room.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="relative">
-                <img
-                  src={room.image}
-                  alt={room.roomType}
-                  className="w-full h-48 object-cover object-top"
-                />
-                <div className="absolute top-4 right-4">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(room.status)}`}>
+            <div key={room.id} className="bg-white rounded-lg shadow-sm overflow-hidden group">
+              <Link href={`/admin/rooms/${room.id}`}>
+                <div className="relative">
+                  <img src={room.image} alt={room.roomType} className="w-full h-48 object-cover" />
+                  <div className="absolute inset-0 bg-black bg-opacity-25 group-hover:bg-opacity-40 transition-all duration-300"></div>
+                  <span className={`absolute top-3 right-3 px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(room.status)}`}>
                     {room.status}
                   </span>
                 </div>
-                <div className="absolute top-4 left-4">
-                  <span className="bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
-                    Room {room.roomNumber}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">{room.roomType}</h3>
-                <p className="text-gray-600 text-sm mb-3">{room.hotelName}</p>
-
-                <div className="grid grid-cols-2 gap-4 mb-4">
+              </Link>
+              <div className="p-4">
+                <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm text-gray-500">Price per night</p>
-                    <p className="text-lg font-semibold text-blue-600">${room.price}</p>
+                    <p className="text-sm text-gray-500">{room.hotelName}</p>
+                    <h3 className="text-lg font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">
+                      <Link href={`/admin/rooms/${room.id}`}>{room.roomType}</Link>
+                    </h3>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Capacity</p>
-                    <p className="text-lg font-semibold text-gray-900">{room.capacity} guests</p>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-sm text-gray-500 mb-1">Room Details</p>
-                  <p className="text-sm text-gray-700">{room.size} • {room.beds}</p>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-sm text-gray-500 mb-2">Amenities</p>
-                  <div className="flex flex-wrap gap-1">
-                    {room.amenities.slice(0, 3).map(amenity => (
-                      <span key={amenity} className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">
-                        {amenity}
-                      </span>
-                    ))}
-                    {room.amenities.length > 3 && (
-                      <span className="text-gray-500 text-xs">+{room.amenities.length - 3} more</span>
-                    )}
+                  <div className="flex space-x-2 mt-1">
+                    <Link href={`/admin/rooms/${room.id}/edit`}>
+                      <i className="ri-pencil-line text-gray-500 hover:text-blue-600 transition-colors cursor-pointer"></i>
+                    </Link>
+                    <i onClick={() => handleDelete(room.id)} className="ri-delete-bin-line text-gray-500 hover:text-red-600 transition-colors cursor-pointer"></i>
                   </div>
                 </div>
-
-                <div className="flex space-x-2">
-                  <Link href={`/admin/rooms/${room.id}`} className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap text-center text-sm">
+                <p className="text-sm text-gray-600 mt-2">Room {room.roomNumber}</p>
+                <div className="flex justify-between items-center mt-4">
+                  <p className="text-lg font-bold text-gray-900">${room.price}<span className="text-sm font-normal text-gray-500">/night</span></p>
+                  <Link href={`/admin/rooms/${room.id}`} className="text-sm font-medium text-blue-600 hover:underline">
                     View Details
-                  </Link>
-                  <Link href={`/admin/rooms/${room.id}/edit`} className="flex-1 border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap text-center text-sm">
-                    Edit
                   </Link>
                 </div>
               </div>
             </div>
           ))}
         </div>
-
-        {/* Empty State */}
-        {filteredRooms.length === 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <i className="ri-hotel-bed-line text-4xl text-gray-400 mb-4 w-16 h-16 flex items-center justify-center mx-auto"></i>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Rooms Found</h3>
-            <p className="text-gray-600 mb-4">No rooms match your current search criteria</p>
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setSelectedHotel('all');
-                setSelectedStatus('all');
-              }}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap"
-            >
-              Clear Filters
-            </button>
-          </div>
-        )}
       </div>
 
       <Footer />

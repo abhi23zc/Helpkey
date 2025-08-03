@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@react-google-maps/api": "^2.19.3",
+    "cloudinary": "^2.7.0",
+    "cloudinary-react": "^1.8.1",
     "firebase": "^12.0.0",
     "next": "15.3.2",
     "react": "^19.0.0",
