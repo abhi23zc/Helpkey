@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function SearchForm() {
   const [destination, setDestination] = useState('');
@@ -9,10 +10,14 @@ export default function SearchForm() {
   const [checkOut, setCheckOut] = useState('');
   const [guests, setGuests] = useState('2');
   const [rooms, setRooms] = useState('1');
+  const router = useRouter();
 
   const handleSearch = () => {
-    // Handle search logic here
-    console.log('Searching for:', { destination, checkIn, checkOut, guests, rooms });
+    if (destination.trim()) {
+      router.push(`/hotels?location=${encodeURIComponent(destination.trim())}`);
+    } else {
+      router.push('/hotels');
+    }
   };
 
   return (

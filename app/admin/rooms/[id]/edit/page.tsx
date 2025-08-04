@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { db } from '@/config/firebase';
 import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
+import { uploadToCloudinary } from '@/utils/cloudinary';
 
 export default function EditRoom() {
   const [hotelId, setHotelId] = useState('');
@@ -17,9 +18,15 @@ export default function EditRoom() {
   const [capacity, setCapacity] = useState('');
   const [status, setStatus] = useState('Available');
   const [amenities, setAmenities] = useState('');
-  const [image, setImage] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState<Array<{
+    file: File;
+    progress: number;
+    preview: string;
+  }>>([]);
   const [hotels, setHotels] = useState([]);
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const params = useParams();
   const { id } = params;
@@ -47,12 +54,88 @@ export default function EditRoom() {
           setCapacity(roomData.capacity.toString());
           setStatus(roomData.status);
           setAmenities(roomData.amenities.join(', '));
-          setImage(roomData.image);
+          setImages(roomData.images || []);
         }
       };
       fetchRoom();
     }
   }, [id]);
+
+  const handleFileSelect = async (files: FileList) => {
+    const newFiles = Array.from(files).filter(file => 
+      file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024 // 5MB limit
+    );
+
+    if (newFiles.length === 0) {
+      alert('Please select valid image files (max 5MB each)');
+      return;
+    }
+
+    const newUploadingImages = newFiles.map(file => ({
+      file,
+      progress: 0,
+      preview: URL.createObjectURL(file)
+    }));
+
+    setUploadingImages(prev => [...prev, ...newUploadingImages]);
+
+    for (let i = 0; i < newFiles.length; i++) {
+      const file = newFiles[i];
+      const index = uploadingImages.length + i;
+
+      try {
+        const imageUrl = await uploadToCloudinary(file, (progress) => {
+          setUploadingImages(prev => {
+            const updated = [...prev];
+            updated[index] = { ...updated[index], progress };
+            return updated;
+          });
+        });
+
+        setImages(prev => [...prev, imageUrl]);
+        setUploadingImages(prev => prev.filter((_, idx) => idx !== index));
+      } catch (error) {
+        console.error('Upload failed:', error);
+        alert('Failed to upload image. Please try again.');
+        setUploadingImages(prev => prev.filter((_, idx) => idx !== index));
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleFileSelect(files);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleFileSelect(files);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeUploadingImage = (index: number) => {
+    setUploadingImages(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -71,7 +154,7 @@ export default function EditRoom() {
         capacity: parseInt(capacity, 10),
         status,
         amenities: amenities.split(',').map(item => item.trim()),
-        image,
+        images,
       });
       router.push('/admin/rooms');
     } catch (error) {
@@ -185,15 +268,71 @@ export default function EditRoom() {
             </div>
 
             <div>
-              <label htmlFor="image" className="block text-sm font-medium text-gray-700">Image URL</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Room Images</label>
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md cursor-pointer hover:border-gray-400"
+              >
+                <div className="space-y-1 text-center">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <div className="flex text-sm text-gray-600">
+                    <span className="relative bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+                      <span>Upload files</span>
+                    </span>
+                    <p className="pl-1">or drag and drop</p>
+                  </div>
+                  <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                </div>
+              </div>
               <input
-                type="text"
-                id="image"
-                value={image}
-                onChange={(e) => setImage(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleFileInput}
+                className="hidden"
               />
             </div>
+
+            {(uploadingImages.length > 0 || images.length > 0) && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Uploaded Images</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {uploadingImages.map((uploading, index) => (
+                    <div key={`uploading-${index}`} className="relative">
+                      <img src={uploading.preview} alt="Uploading..." className="w-full h-24 object-cover rounded-lg" />
+                      <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center">
+                        <div className="text-white text-sm">{uploading.progress}%</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeUploadingImage(index)}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {images.map((image, index) => (
+                    <div key={`image-${index}`} className="relative">
+                      <img src={image} alt={`Room image ${index + 1}`} className="w-full h-24 object-cover rounded-lg" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>

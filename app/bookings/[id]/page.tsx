@@ -1,15 +1,20 @@
+import { Metadata } from 'next';
 import BookingDetail from './BookingDetail';
 
-export async function generateStaticParams() {
-  return [
-    { id: '1' },
-    { id: '2' },
-    { id: '3' },
-    { id: '4' },
-    { id: '5' },
-  ];
+interface PageProps {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default function BookingDetailPage({ params }: { params: { id: string } }) {
-  return <BookingDetail bookingId={params.id} />;
+export default async function BookingDetailPage({ params }: PageProps) {
+  const { id } = await params;
+  return <BookingDetail bookingId={id} />;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: `Booking ${id} - Helpkey`,
+    description: `View details for booking ${id}`,
+  };
 }

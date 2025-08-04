@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from '@/config/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { uploadToCloudinary } from '@/utils/cloudinary';
 
 interface EditHotelModalProps {
   isOpen: boolean;
@@ -34,7 +35,10 @@ export default function EditHotelModal({ isOpen, onClose, hotelId }: EditHotelMo
   });
 
   const [currentAmenity, setCurrentAmenity] = useState('');
-  const [currentImage, setCurrentImage] = useState('');
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const amenityOptions = [
     'Free WiFi', 'Swimming Pool', 'Fitness Center', 'Spa & Wellness', 'Restaurant',
@@ -120,21 +124,90 @@ export default function EditHotelModal({ isOpen, onClose, hotelId }: EditHotelMo
     }));
   };
 
-  const addImage = () => {
-    if (currentImage && !formData.images.includes(currentImage)) {
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, currentImage]
-      }));
-      setCurrentImage('');
-    }
-  };
-
   const removeImage = (image: string) => {
     setFormData(prev => ({
       ...prev,
       images: prev.images.filter(img => img !== image)
     }));
+  };
+
+  // Replace the handleFileSelect function with this corrected version:
+  
+  const handleFileSelect = async (files: FileList) => {
+    setUploadError('');
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError('File size must be less than 5MB');
+        continue;
+      }
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setUploadError('Please select valid image files');
+        continue;
+      }
+  
+      const fileId = `${file.name}-${Date.now()}`;
+      
+      try {
+        const uploadedUrl = await uploadToCloudinary(
+          file,
+          (progress) => {
+            setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
+          },
+          'hotels'
+        );
+        
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, uploadedUrl]
+        }));
+        
+        // Clear progress after completion
+        setTimeout(() => {
+          setUploadProgress(prev => {
+            const newProgress = { ...prev };
+            delete newProgress[fileId];
+            return newProgress;
+          });
+        }, 1000);
+        
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        setUploadError('Failed to upload image. Please try again.');
+      }
+    }
+  };
+  
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleFileSelect(files);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleFileSelect(files);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -178,11 +251,14 @@ export default function EditHotelModal({ isOpen, onClose, hotelId }: EditHotelMo
       // Show success message
       setShowSuccess(true);
       
-      // Close modal after a short delay
+      // Close modal after a short delay - use router refresh instead of reload
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
-        window.location.reload(); // Refresh the page to show updated data
+        // Instead of window.location.reload(), use router refresh
+        if (typeof window !== 'undefined') {
+          window.location.href = '/admin/hotels';
+        }
       }, 2000);
     } catch (error: any) {
       console.error('Error updating hotel:', error);
@@ -199,129 +275,110 @@ export default function EditHotelModal({ isOpen, onClose, hotelId }: EditHotelMo
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Edit Hotel</h2>
-            <button 
+            <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-gray-400 hover:text-gray-600 cursor-pointer"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
           {showSuccess ? (
-            <div className="bg-green-50 border-l-4 border-green-500 p-6 mb-4 text-center">
-              <div className="flex flex-col items-center justify-center">
-                <div className="flex-shrink-0 mb-4">
-                  <svg className="h-12 w-12 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-green-800 mb-2">Hotel Updated Successfully!</h3>
-                <p className="text-green-700">Refreshing page...</p>
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
               </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Hotel Updated Successfully!</h3>
+              <p className="text-gray-600">The hotel information has been updated.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
-                <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-red-700">{error}</p>
-                    </div>
-                  </div>
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                  {error}
                 </div>
               )}
 
-              {/* Basic Information */}
-              <div className="bg-white rounded-lg shadow-sm p-4">
-                <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Hotel Name *</label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Star Rating *</label>
-                    <select
-                      name="stars"
-                      value={formData.stars}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
-                    >
-                      <option value={1}>1 Star</option>
-                      <option value={2}>2 Stars</option>
-                      <option value={3}>3 Stars</option>
-                      <option value={4}>4 Stars</option>
-                      <option value={5}>5 Stars</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Location *</label>
-                    <input
-                      type="text"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
-                    <input
-                      type="text"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Hotel Name *</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
 
-                <div className="mt-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location *</label>
+                  <input
+                    type="text"
+                    name="location"
+                    value={formData.location}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Stars</label>
+                  <select
+                    name="stars"
+                    value={formData.stars}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
+                  >
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <option key={star} value={star}>{star} Stars</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
                   <textarea
                     name="description"
@@ -383,43 +440,86 @@ export default function EditHotelModal({ isOpen, onClose, hotelId }: EditHotelMo
               <div className="bg-white rounded-lg shadow-sm p-4">
                 <h3 className="text-lg font-semibold mb-4">Hotel Images</h3>
                 
-                <div className="mb-3">
-                  <div className="flex gap-2">
-                    <input
-                      type="url"
-                      value={currentImage}
-                      onChange={(e) => setCurrentImage(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="https://example.com/image.jpg"
-                    />
+                {/* Upload Area */}
+                <div
+                  className={`border-2 border-dashed rounded-lg p-6 mb-4 text-center transition-colors ${
+                    isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <p className="text-sm text-gray-600 mb-2">
+                    Drag and drop images here, or{' '}
                     <button
                       type="button"
-                      onClick={addImage}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-blue-600 hover:text-blue-700 font-medium"
                     >
-                      Add
+                      browse to upload
                     </button>
-                  </div>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Maximum file size: 5MB per image
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFileInput}
+                    className="hidden"
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {formData.images.map((image, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={image}
-                        alt={`Hotel ${index + 1}`}
-                        className="w-full h-24 object-cover object-top rounded-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(image)}
-                        className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition-colors cursor-pointer"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                {uploadError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm mb-4">
+                    {uploadError}
+                  </div>
+                )}
+
+                {/* Image Previews */}
+                {formData.images.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {formData.images.map((image, index) => {
+                      const fileId = Object.keys(uploadProgress).find(key => 
+                        formData.images[index]?.includes(key.split('-').slice(1).join('-'))
+                      );
+                      const progress = fileId ? uploadProgress[fileId] : 100;
+                      
+                      return (
+                        <div key={index} className="relative group">
+                          <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                            <img
+                              src={image}
+                              alt={`Hotel ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            {progress < 100 && (
+                              <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                                <div className="text-white text-sm font-medium">
+                                  {progress}%
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeImage(image)}
+                            className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Policies */}

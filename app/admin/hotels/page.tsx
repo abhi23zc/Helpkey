@@ -7,6 +7,7 @@ import Footer from '@/components/Footer';
 import EditHotelModal from '@/components/EditHotelModal';
 import { db } from '@/config/firebase';
 import { collection, getDocs, query, where, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { useAuth } from '@/context/AuthContext';
 
 export default function HotelManagement() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,12 +19,16 @@ export default function HotelManagement() {
   const [selectedHotelId, setSelectedHotelId] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [hotelToDelete, setHotelToDelete] = useState<{id: string, name: string} | null>(null);
+  const { user } = useAuth();
 
   // Fetch hotels from Firestore
   useEffect(() => {
     const fetchHotels = async () => {
       try {
-        const hotelsQuery = query(collection(db, 'hotels'));
+        const hotelsQuery = query(
+          collection(db, 'hotels'),
+          where('hotelAdmin', '==', user?.uid)
+        );
         const querySnapshot = await getDocs(hotelsQuery);
         
         const hotelsData = querySnapshot.docs.map(doc => ({

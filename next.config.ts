@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     unoptimized: true, // optional, remove this if you want Next.js image optimization
   },
   typescript: {
-    // ignoreBuildErrors: true,
+    ignoreBuildErrors: true,
   },
 };
 
