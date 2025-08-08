@@ -7,6 +7,29 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+import { db } from '@/config/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+
+interface BookingData {
+  hotelId: string;
+  roomId: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  totalPrice: number;
+  taxesAndFees: number;
+  hotelDetails: {
+    name: string;
+    location: string;
+    image: string;
+  };
+  roomDetails: {
+    type: string;
+    price: number;
+    nights: number;
+  };
+}
+
 function BookingContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -92,18 +115,23 @@ function BookingContent() {
     }
   };
 
+  // Remove the static hotels object and update the useEffect
+  
   useEffect(() => {
-    const hotelId = searchParams.get('hotel') || '1';
-    const roomId = searchParams.get('room') || '1';
-    const checkIn = searchParams.get('checkin') || '2024-03-15';
-    const checkOut = searchParams.get('checkout') || '2024-03-20';
+    const hotelId = searchParams.get('hotel') || '';
+    const roomId = searchParams.get('room') || '';
+    const checkIn = searchParams.get('checkin') || '';
+    const checkOut = searchParams.get('checkout') || '';
     const guests = parseInt(searchParams.get('guests') || '2');
-    const price = parseInt(searchParams.get('price') || '399');
-    const nights = parseInt(searchParams.get('nights') || '5');
-
-    const totalPrice = price * nights;
-    const taxesAndFees = Math.round(totalPrice * 0.15);
-
+    const price = parseInt(searchParams.get('price') || '0');
+    const nights = parseInt(searchParams.get('nights') || '0');
+    const totalPrice = parseInt(searchParams.get('totalPrice') || '0');
+    const taxesAndFees = parseInt(searchParams.get('taxesAndFees') || '0');
+    const hotelName = searchParams.get('hotelName') || '';
+    const roomType = searchParams.get('roomType') || '';
+    const location = searchParams.get('location') || '';
+    const image = searchParams.get('image') || '';
+  
     setBookingData({
       hotelId,
       roomId,
@@ -111,7 +139,17 @@ function BookingContent() {
       checkOut,
       guests,
       totalPrice,
-      taxesAndFees
+      taxesAndFees,
+      hotelDetails: {
+        name: hotelName,
+        location: location,
+        image: image
+      },
+      roomDetails: {
+        type: roomType,
+        price: price,
+        nights: nights
+      }
     });
   }, [searchParams]);
 
@@ -187,22 +225,75 @@ function BookingContent() {
       return;
     }
 
-    setTimeout(() => {
+    try {
+      // Generate booking reference
+      const reference = 'BK' + Date.now().toString().slice(-6);
+      
+      // Create booking document in Firestore
+      const newBookingData = {
+        reference,
+        hotelId: hotel.id,
+        roomId: selectedRoom.id,
+        checkIn: bookingData.checkIn,
+        checkOut: bookingData.checkOut,
+        guests: bookingData.guests,
+        totalPrice: bookingData.totalPrice,
+        taxesAndFees: bookingData.taxesAndFees,
+        totalAmount: bookingData.totalPrice + bookingData.taxesAndFees,
+        guestInfo: {
+          firstName: guestInfo.firstName,
+          lastName: guestInfo.lastName,
+          email: guestInfo.email,
+          phone: guestInfo.phone,
+          specialRequests: guestInfo.specialRequests
+        },
+        paymentInfo: {
+          cardholderName: paymentInfo.cardholderName,
+          // Store only last 4 digits of card number for security
+          lastFourDigits: paymentInfo.cardNumber.slice(-4),
+          billingAddress: paymentInfo.billingAddress,
+          city: paymentInfo.city,
+          zipCode: paymentInfo.zipCode,
+          country: paymentInfo.country
+        },
+        status: 'confirmed',
+        createdAt: serverTimestamp(),
+        hotelDetails: {
+          name: hotel.name,
+          location: hotel.location
+        },
+        roomDetails: {
+          type: selectedRoom.type,
+          price: selectedRoom.price,
+          size: selectedRoom.size,
+          beds: selectedRoom.beds
+        }
+      };
+  
+      // Add to Firestore
+      const bookingsRef = collection(db, 'bookings');
+      await addDoc(bookingsRef, newBookingData);
+  
+      // Update UI states
+      setBookingReference(reference);
       setPaymentProcessing(false);
       setPaymentSuccess(true);
-
-      const reference = 'BK' + Date.now().toString().slice(-6);
-      setBookingReference(reference);
-
+  
       setTimeout(() => {
         setIsSubmitting(false);
         setShowSuccess(true);
-
+  
         setTimeout(() => {
           router.push('/bookings');
         }, 3000);
       }, 1000);
-    }, 3000);
+  
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      setIsSubmitting(false);
+      setPaymentProcessing(false);
+      alert('There was an error processing your booking. Please try again.');
+    }
   };
 
   if (paymentProcessing) {
@@ -446,90 +537,12 @@ function BookingContent() {
               </div>
             )}
 
-            {currentStep === 2 && (
+              {currentStep === 2 && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Guest Information</h2>
 
                 <form className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        First Name *
-                      </label>
-                      <input
-                        type="text"
-                        name="firstName"
-                        value={guestInfo.firstName}
-                        onChange={handleGuestInfoChange}
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter your first name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Last Name *
-                      </label>
-                      <input
-                        type="text"
-                        name="lastName"
-                        value={guestInfo.lastName}
-                        onChange={handleGuestInfoChange}
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter your last name"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email Address *
-                      </label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={guestInfo.email}
-                        onChange={handleGuestInfoChange}
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter your email"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone Number *
-                      </label>
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={guestInfo.phone}
-                        onChange={handleGuestInfoChange}
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter your phone number"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Special Requests (Optional)
-                    </label>
-                    <textarea
-                      name="specialRequests"
-                      value={guestInfo.specialRequests}
-                      onChange={handleGuestInfoChange}
-                      rows={4}
-                      maxLength={500}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                      placeholder="Any special requests or preferences..."
-                    ></textarea>
-                    <div className="text-right text-sm text-gray-500 mt-1">
-                      {guestInfo.specialRequests.length}/500 characters
-                    </div>
-                  </div>
+                  {/* ... existing form fields ... */}
                 </form>
 
                 <div className="mt-6 flex justify-between">

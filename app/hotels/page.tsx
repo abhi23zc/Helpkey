@@ -1,26 +1,25 @@
-
 'use client';
 
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { db } from '@/config/firebase';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { useSearchParams } from 'next/navigation';
 
 export default function Hotels() {
-  const [sortBy, setSortBy] = useState('recommended');
+  const searchParams = useSearchParams();
+  const searchLocation = searchParams.get('location') || '';
+
+  const [hotels, setHotels] = useState([]);
+  const [allHotels, setAllHotels] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [priceRange, setPriceRange] = useState([0, 500]);
   const [selectedStars, setSelectedStars] = useState([]);
   const [selectedAmenities, setSelectedAmenities] = useState([]);
-  const [hotels, setHotels] = useState([]);
-  const [allHotels, setAllHotels] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  const searchParams = useSearchParams();
-  const searchLocation = searchParams.get('location') || '';
+  const [sortBy, setSortBy] = useState('recommended');
 
   useEffect(() => {
     const fetchHotels = async () => {
@@ -28,7 +27,7 @@ export default function Hotels() {
       try {
         const hotelsCollectionRef = collection(db, 'hotels');
         const data = await getDocs(hotelsCollectionRef);
-        
+
         const fetchedHotels = data.docs.map(doc => ({
           ...doc.data(),
           id: doc.id,
@@ -44,22 +43,20 @@ export default function Hotels() {
         }));
 
         setAllHotels(fetchedHotels);
-        
-        // Apply fuzzy search on location
+
         if (searchLocation) {
           const searchLower = searchLocation.toLowerCase();
-          const filteredHotels = fetchedHotels.filter(hotel => 
+          const filteredHotels = fetchedHotels.filter(hotel =>
             hotel.location?.toLowerCase().includes(searchLower) ||
             hotel.address?.toLowerCase().includes(searchLower) ||
             hotel.name?.toLowerCase().includes(searchLower)
           );
-          
-          // If no results found, return all hotels
+
           setHotels(filteredHotels.length > 0 ? filteredHotels : fetchedHotels);
         } else {
           setHotels(fetchedHotels);
         }
-        
+
         setLoading(false);
       } catch (error) {
         console.error('Error fetching hotels:', error);
@@ -70,18 +67,17 @@ export default function Hotels() {
     fetchHotels();
   }, [searchLocation]);
 
-  // Update the search header to show search location
   const handleStarFilter = (stars) => {
-    setSelectedStars(prev => 
-      prev.includes(stars) 
+    setSelectedStars(prev =>
+      prev.includes(stars)
         ? prev.filter(s => s !== stars)
         : [...prev, stars]
     );
   };
 
   const handleAmenityFilter = (amenity) => {
-    setSelectedAmenities(prev => 
-      prev.includes(amenity) 
+    setSelectedAmenities(prev =>
+      prev.includes(amenity)
         ? prev.filter(a => a !== amenity)
         : [...prev, amenity]
     );
@@ -90,7 +86,7 @@ export default function Hotels() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       {/* Search Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -103,7 +99,7 @@ export default function Hotels() {
                 {searchLocation ? `Searching for "${searchLocation}"` : 'Showing all available hotels'}
               </p>
             </div>
-            <button 
+            <button
               onClick={() => setFilterOpen(!filterOpen)}
               className="md:hidden bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer whitespace-nowrap"
             >
@@ -119,72 +115,65 @@ export default function Hotels() {
           <div className={`lg:w-1/4 ${filterOpen ? 'block' : 'hidden lg:block'}`}>
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
-              
+
               {/* Price Range */}
               <div className="mb-6">
                 <h4 className="font-medium text-gray-700 mb-3">Price Range</h4>
-                <div className="space-y-2">
-                  <input
-                    type="range"
-                    min="0"
-                    max="500"
-                    value={priceRange[1]}
-                    onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>$0</span>
-                    <span>${priceRange[1]}</span>
-                  </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="500"
+                  value={priceRange[1]}
+                  onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>$0</span>
+                  <span>${priceRange[1]}</span>
                 </div>
               </div>
 
               {/* Star Rating */}
               <div className="mb-6">
                 <h4 className="font-medium text-gray-700 mb-3">Star Rating</h4>
-                <div className="space-y-2">
-                  {[5, 4, 3, 2, 1].map(stars => (
-                    <label key={stars} className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedStars.includes(stars)}
-                        onChange={() => handleStarFilter(stars)}
-                        className="mr-2"
-                      />
-                      <div className="flex items-center">
-                        {[...Array(stars)].map((_, i) => (
-                          <i key={i} className="ri-star-fill text-yellow-400 text-sm w-4 h-4 flex items-center justify-center"></i>
-                        ))}
-                        <span className="ml-2 text-sm text-gray-600">{stars} stars</span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
+                {[5, 4, 3, 2, 1].map(stars => (
+                  <label key={stars} className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedStars.includes(stars)}
+                      onChange={() => handleStarFilter(stars)}
+                      className="mr-2"
+                    />
+                    <div className="flex items-center">
+                      {[...Array(stars)].map((_, i) => (
+                        <i key={i} className="ri-star-fill text-yellow-400 text-sm w-4 h-4 flex items-center justify-center"></i>
+                      ))}
+                      <span className="ml-2 text-sm text-gray-600">{stars} stars</span>
+                    </div>
+                  </label>
+                ))}
               </div>
 
               {/* Amenities */}
               <div className="mb-6">
                 <h4 className="font-medium text-gray-700 mb-3">Amenities</h4>
-                <div className="space-y-2">
-                  {["Free WiFi", "Pool", "Spa", "Restaurant", "Beach Access", "Parking", "Gym"].map(amenity => (
-                    <label key={amenity} className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedAmenities.includes(amenity)}
-                        onChange={() => handleAmenityFilter(amenity)}
-                        className="mr-2"
-                      />
-                      <span className="text-sm text-gray-600">{amenity}</span>
-                    </label>
-                  ))}
-                </div>
+                {["Free WiFi", "Pool", "Spa", "Restaurant", "Beach Access", "Parking", "Gym"].map(amenity => (
+                  <label key={amenity} className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedAmenities.includes(amenity)}
+                      onChange={() => handleAmenityFilter(amenity)}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-600">{amenity}</span>
+                  </label>
+                ))}
               </div>
             </div>
           </div>
 
           {/* Hotel List */}
           <div className="lg:w-3/4">
-            {/* Sort Options */}
             <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">
@@ -206,7 +195,7 @@ export default function Hotels() {
               </div>
             </div>
 
-            {/* Loading State */}
+            {/* Loading Indicator */}
             {loading && (
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
@@ -220,7 +209,7 @@ export default function Hotels() {
                 <div key={hotel.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                   <div className="flex flex-col md:flex-row">
                     <div className="md:w-1/3">
-                      <img 
+                      <img
                         src={hotel.image}
                         alt={hotel.name}
                         className="w-full h-48 md:h-full object-cover object-top"
@@ -243,16 +232,12 @@ export default function Hotels() {
                         </div>
                         <div className="text-right">
                           <div className="flex items-center mb-1">
-                            <span className="bg-blue-600 text-white px-2 py-1 rounded text-sm font-semibold">
-                              {hotel.rating}
-                            </span>
+                            <span className="bg-blue-600 text-white px-2 py-1 rounded text-sm font-semibold">{hotel.rating}</span>
                             <span className="ml-2 text-sm text-gray-600">({hotel.reviews} reviews)</span>
                           </div>
-                          <div className="text-right">
-                            <span className="text-gray-400 line-through text-sm">${hotel.originalPrice}</span>
-                            <div className="text-2xl font-bold text-blue-600">${hotel.price}</div>
-                            <span className="text-sm text-gray-600">per night</span>
-                          </div>
+                          <span className="text-gray-400 line-through text-sm">${hotel.originalPrice}</span>
+                          <div className="text-2xl font-bold text-blue-600">${hotel.price}</div>
+                          <span className="text-sm text-gray-600">per night</span>
                         </div>
                       </div>
 
@@ -279,7 +264,7 @@ export default function Hotels() {
                   </div>
                 </div>
               ))}
-              
+
               {!loading && hotels.length === 0 && (
                 <div className="text-center py-12">
                   <i className="ri-search-line text-4xl text-gray-400 mb-4"></i>

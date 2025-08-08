@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { db } from "@/config/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 
 interface HotelDetailProps {
   hotelId: string;
@@ -29,10 +29,30 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
         const hotelSnap = await getDoc(hotelRef);
 
         if (hotelSnap.exists()) {
-          setHotel({ id: hotelSnap.id, ...hotelSnap.data() });
+          const hotelData = { id: hotelSnap.id, ...hotelSnap.data() };
+          
+          // Fetch rooms for this hotel
+          const roomsQuery = query(
+            collection(db, "rooms"),
+            where("hotelId", "==", hotelId)
+          );
+          const roomsSnapshot = await getDocs(roomsQuery);
+          const rooms = roomsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            image: doc.data().images?.[0] || "",
+            type: doc.data().roomType,
+            beds: doc.data().beds,
+            size: doc.data().size,
+            capacity: doc.data().capacity,
+            price: doc.data().price,
+            amenities: doc.data().amenities || []
+          }));
+          
+          setHotel({ ...hotelData, rooms });
         } else {
           console.error("No hotel found with this ID");
-          router.push("/hotels"); // Redirect to hotels list if not found
+          router.push("/hotels");
         }
       } catch (error) {
         console.error("Error fetching hotel:", error);
@@ -79,14 +99,23 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
     if (!selectedRoom) return;
 
     const nights = calculateNights();
+    const totalPrice = selectedRoom.price * nights;
+    const taxesAndFees = Math.round(totalPrice * 0.15);
+
     const bookingParams = new URLSearchParams({
-      hotel: hotel.id.toString(),
-      room: selectedRoom.id.toString(),
+      hotel: hotel.id,
+      room: selectedRoom.id,
       checkin: checkIn,
       checkout: checkOut,
       guests: guests.toString(),
       price: selectedRoom.price.toString(),
       nights: nights.toString(),
+      totalPrice: totalPrice.toString(),
+      taxesAndFees: taxesAndFees.toString(),
+      hotelName: hotel.name,
+      roomType: selectedRoom.type,
+      location: hotel.location,
+      image: selectedRoom.image || ""
     });
 
     router.push(`/booking?${bookingParams.toString()}`);
@@ -99,21 +128,22 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
       {/* Hotel Images Gallery */}
       <div className="relative">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="lg:col-span-2 lg:row-span-2">
+          <div className="lg:col-span-2 lg:row-span-2 h-[200px] sm:h-[300px] md:h-[400px] lg:h-[500px]">
             <img
               src={hotel.images[0]}
               alt={hotel.name}
-              className="w-full h-64 lg:h-full object-cover object-top rounded-lg"
+              className="w-full h-full object-cover rounded-lg"
             />
           </div>
-          <div className="grid grid-cols-1 gap-2 lg:col-span-2">
+          <div className="grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-2 lg:col-span-2">
             {hotel.images.slice(1).map((image, index) => (
-              <img
-                key={index}
-                src={image}
-                alt={`${hotel.name} view ${index + 1}`}
-                className="w-full h-32 object-cover object-top rounded-lg"
-              />
+              <div key={index} className="h-[100px] sm:h-[145px] md:h-[195px] lg:h-[245px]">
+                <img
+                  src={image}
+                  alt={`${hotel.name} view ${index + 1}`}
+                  className="w-full h-full object-cover rounded-lg"
+                />
+              </div>
             ))}
           </div>
         </div>
