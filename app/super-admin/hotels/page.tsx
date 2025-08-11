@@ -1,131 +1,92 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { db } from '@/config/firebase';
+import { collection, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+
+interface Hotel {
+  id: string;
+  name: string;
+  location: string;
+  address: string;
+  owner: string;
+  ownerEmail: string;
+  rooms: number;
+  stars: number;
+  status: string;
+  approvalStatus: string;
+  revenue: number;
+  commission: number;
+  occupancy: number;
+  joinDate: string;
+  lastUpdate: string;
+  violations: number;
+  images: string[];
+  email: string;
+  phone: string;
+  createdAt: any;
+  updatedAt: any;
+}
 
 export default function SuperAdminHotels() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedOwner, setSelectedOwner] = useState('all');
+  const [hotels, setHotels] = useState<Hotel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
 
-  const hotels = [
-    {
-      id: 1,
-      name: "Grand Luxury Resort",
-      location: "Miami Beach, Florida",
-      owner: "John Smith",
-      ownerEmail: "john.smith@email.com",
-      rooms: 45,
-      stars: 5,
-      status: "Active",
-      approvalStatus: "Approved",
-      revenue: 125000,
-      commission: 12500,
-      occupancy: 85.5,
-      joinDate: "2024-01-15",
-      lastUpdate: "2024-03-10",
-      violations: 0,
-      image: "https://readdy.ai/api/search-image?query=Luxury%20beachfront%20resort%20hotel%20exterior%20with%20infinity%20pool%2C%20palm%20trees%2C%20modern%20architecture%2C%20ocean%20view%2C%20tropical%20paradise%2C%20white%20sand%20beach%2C%20elegant%20design%2C%20five%20star%20accommodation&width=400&height=300&seq=super-hotel-1&orientation=landscape"
-    },
-    {
-      id: 2,
-      name: "City Center Business Hotel",
-      location: "Downtown Manhattan, New York",
-      owner: "Sarah Johnson",
-      ownerEmail: "sarah.johnson@email.com",
-      rooms: 78,
-      stars: 4,
-      status: "Active",
-      approvalStatus: "Approved",
-      revenue: 198000,
-      commission: 19800,
-      occupancy: 92.3,
-      joinDate: "2024-02-20",
-      lastUpdate: "2024-03-12",
-      violations: 0,
-      image: "https://readdy.ai/api/search-image?query=Modern%20business%20hotel%20in%20city%20center%2C%20sleek%20contemporary%20design%2C%20glass%20facade%2C%20urban%20setting%2C%20professional%20atmosphere%2C%20downtown%20location%2C%20sophisticated%20interior%2C%20four%20star%20accommodation&width=400&height=300&seq=super-hotel-2&orientation=landscape"
-    },
-    {
-      id: 3,
-      name: "Boutique Garden Hotel",
-      location: "Beverly Hills, California",
-      owner: "Michael Chen",
-      ownerEmail: "michael.chen@email.com",
-      rooms: 33,
-      stars: 4,
-      status: "Active",
-      approvalStatus: "Approved",
-      revenue: 89000,
-      commission: 8900,
-      occupancy: 78.9,
-      joinDate: "2024-03-01",
-      lastUpdate: "2024-03-11",
-      violations: 0,
-      image: "https://readdy.ai/api/search-image?query=Boutique%20hotel%20with%20beautiful%20garden%20courtyard%2C%20elegant%20Victorian%20architecture%2C%20lush%20landscaping%2C%20intimate%20atmosphere%2C%20luxury%20amenities%2C%20charming%20facade%2C%20upscale%20neighborhood%20setting&width=400&height=300&seq=super-hotel-3&orientation=landscape"
-    },
-    {
-      id: 4,
-      name: "Mountain View Lodge",
-      location: "Aspen, Colorado",
-      owner: "Emily Davis",
-      ownerEmail: "emily.davis@email.com",
-      rooms: 28,
-      stars: 3,
-      status: "Suspended",
-      approvalStatus: "Approved",
-      revenue: 45000,
-      commission: 4500,
-      occupancy: 0,
-      joinDate: "2024-01-10",
-      lastUpdate: "2024-03-05",
-      violations: 2,
-      image: "https://readdy.ai/api/search-image?query=Mountain%20lodge%20hotel%20with%20wooden%20architecture%2C%20alpine%20setting%2C%20snow-capped%20peaks%2C%20rustic%20luxury%2C%20cozy%20atmosphere%2C%20ski%20resort%20location%2C%20natural%20materials%2C%20three%20star%20accommodation&width=400&height=300&seq=super-hotel-4&orientation=landscape"
-    },
-    {
-      id: 5,
-      name: "Oceanfront Paradise Resort",
-      location: "Malibu, California",
-      owner: "David Wilson",
-      ownerEmail: "david.wilson@email.com",
-      rooms: 52,
-      stars: 5,
-      status: "Pending",
-      approvalStatus: "Pending Review",
-      revenue: 0,
-      commission: 0,
-      occupancy: 0,
-      joinDate: "2024-03-08",
-      lastUpdate: "2024-03-12",
-      violations: 0,
-      image: "https://readdy.ai/api/search-image?query=Oceanfront%20resort%20hotel%20with%20private%20beach%2C%20luxury%20amenities%2C%20infinity%20pool%2C%20palm%20trees%2C%20tropical%20paradise%2C%20premium%20accommodation%2C%20stunning%20ocean%20views%2C%20five%20star%20service&width=400&height=300&seq=super-hotel-5&orientation=landscape"
-    },
-    {
-      id: 6,
-      name: "Historic Downtown Inn",
-      location: "Boston, Massachusetts",
-      owner: "Lisa Anderson",
-      ownerEmail: "lisa.anderson@email.com",
-      rooms: 24,
-      stars: 3,
-      status: "Active",
-      approvalStatus: "Under Review",
-      revenue: 34000,
-      commission: 3400,
-      occupancy: 65.2,
-      joinDate: "2024-02-15",
-      lastUpdate: "2024-03-09",
-      violations: 1,
-      image: "https://readdy.ai/api/search-image?query=Historic%20boutique%20hotel%20in%20downtown%20area%2C%20classic%20architecture%2C%20restored%20building%2C%20traditional%20charm%2C%20urban%20location%2C%20heritage%20design%2C%20cozy%20atmosphere%2C%20three%20star%20accommodation&width=400&height=300&seq=super-hotel-6&orientation=landscape"
+  useEffect(() => {
+    fetchHotels();
+  }, []);
+
+  const fetchHotels = async () => {
+    try {
+      const hotelsCollection = collection(db, 'hotels');
+      const hotelsSnapshot = await getDocs(hotelsCollection);
+      const hotelsData = hotelsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name || '',
+          location: data.location || '',
+          address: data.address || '',
+          owner: data.owner || 'Unknown Owner',
+          ownerEmail: data.email || 'No email provided',
+          rooms: data.totalRooms || 0,
+          stars: parseInt(data.stars) || 0,
+          status: data.status || 'active',
+          approvalStatus: data.approved ? 'Approved' : 'Pending Review',
+          revenue: data.revenue || 0,
+          commission: data.commission || 0,
+          occupancy: data.occupancy || 0,
+          joinDate: data.createdAt?.toDate?.()?.toISOString?.()?.split('T')[0] || new Date().toISOString().split('T')[0],
+          lastUpdate: data.updatedAt?.toDate?.()?.toISOString?.()?.split('T')[0] || new Date().toISOString().split('T')[0],
+          violations: data.violations || 0,
+          images: data.images || [],
+          email: data.email || '',
+          phone: data.phone || '',
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+      });
+      setHotels(hotelsData);
+    } catch (error) {
+      console.error('Error fetching hotels:', error);
+      alert('Failed to load hotels. Please check your permissions.');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active': return 'bg-green-100 text-green-800';
-      case 'Suspended': return 'bg-red-100 text-red-800';
-      case 'Pending': return 'bg-yellow-100 text-yellow-800';
+    switch (status.toLowerCase()) {
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'suspended': return 'bg-red-100 text-red-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -140,6 +101,75 @@ export default function SuperAdminHotels() {
     }
   };
 
+  const handleStatusChange = async (hotelId: string, newStatus: string) => {
+    setUpdating(hotelId);
+    try {
+      const hotelRef = doc(db, 'hotels', hotelId);
+      await updateDoc(hotelRef, {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      });
+      
+      // Update local state
+      setHotels(prevHotels => 
+        prevHotels.map(hotel => 
+          hotel.id === hotelId ? { ...hotel, status: newStatus } : hotel
+        )
+      );
+      
+      alert(`Hotel status successfully changed to ${newStatus}`);
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Failed to update hotel status. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleApprovalChange = async (hotelId: string, newApproval: string) => {
+    setUpdating(hotelId);
+    try {
+      const hotelRef = doc(db, 'hotels', hotelId);
+      await updateDoc(hotelRef, {
+        approved: newApproval === 'Approved',
+        updatedAt: serverTimestamp()
+      });
+      
+      // Update local state
+      setHotels(prevHotels => 
+        prevHotels.map(hotel => 
+          hotel.id === hotelId ? { ...hotel, approvalStatus: newApproval } : hotel
+        )
+      );
+      
+      alert(`Hotel approval status successfully changed to ${newApproval}`);
+    } catch (error) {
+      console.error('Error updating approval:', error);
+      alert('Failed to update hotel approval. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleDeleteHotel = async (hotelId: string) => {
+    if (confirm('Are you sure you want to permanently delete this hotel? This action cannot be undone.')) {
+      setUpdating(hotelId);
+      try {
+        await deleteDoc(doc(db, 'hotels', hotelId));
+        
+        // Remove from local state
+        setHotels(prevHotels => prevHotels.filter(hotel => hotel.id !== hotelId));
+        
+        alert('Hotel successfully deleted');
+      } catch (error) {
+        console.error('Error deleting hotel:', error);
+        alert('Failed to delete hotel. Please try again.');
+      } finally {
+        setUpdating(null);
+      }
+    }
+  };
+
   const filteredHotels = hotels.filter(hotel => {
     const matchesSearch = hotel.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          hotel.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -148,23 +178,6 @@ export default function SuperAdminHotels() {
     const matchesOwner = selectedOwner === 'all' || hotel.owner === selectedOwner;
     return matchesSearch && matchesStatus && matchesOwner;
   });
-
-  const handleStatusChange = (hotelId: number, newStatus: string) => {
-    console.log(`Changing hotel ${hotelId} status to ${newStatus}`);
-    alert(`Hotel status changed to ${newStatus}`);
-  };
-
-  const handleApprovalChange = (hotelId: number, newApproval: string) => {
-    console.log(`Changing hotel ${hotelId} approval to ${newApproval}`);
-    alert(`Hotel approval status changed to ${newApproval}`);
-  };
-
-  const handleDeleteHotel = (hotelId: number) => {
-    if (confirm('Are you sure you want to permanently delete this hotel? This action cannot be undone.')) {
-      console.log(`Deleting hotel ${hotelId}`);
-      alert('Hotel deleted successfully');
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -175,6 +188,20 @@ export default function SuperAdminHotels() {
   };
 
   const uniqueOwners = [...new Set(hotels.map(h => h.owner))];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -207,7 +234,7 @@ export default function SuperAdminHotels() {
               <div className="ml-3">
                 <p className="text-sm text-gray-600">Active Hotels</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {hotels.filter(h => h.status === 'Active').length}
+                  {hotels.filter(h => h.status.toLowerCase() === 'active').length}
                 </p>
               </div>
             </div>
@@ -221,7 +248,7 @@ export default function SuperAdminHotels() {
               <div className="ml-3">
                 <p className="text-sm text-gray-600">Pending</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {hotels.filter(h => h.status === 'Pending').length}
+                  {hotels.filter(h => h.status.toLowerCase() === 'pending').length}
                 </p>
               </div>
             </div>
@@ -235,7 +262,7 @@ export default function SuperAdminHotels() {
               <div className="ml-3">
                 <p className="text-sm text-gray-600">Suspended</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {hotels.filter(h => h.status === 'Suspended').length}
+                  {hotels.filter(h => h.status.toLowerCase() === 'suspended').length}
                 </p>
               </div>
             </div>
@@ -323,13 +350,13 @@ export default function SuperAdminHotels() {
             <div key={hotel.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="relative">
                 <img
-                  src={hotel.image}
+                  src={hotel.images[0] || 'https://via.placeholder.com/400x300?text=No+Image'}
                   alt={hotel.name}
                   className="w-full h-48 object-cover object-top"
                 />
                 <div className="absolute top-4 right-4 flex flex-col space-y-2">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(hotel.status)}`}>
-                    {hotel.status}
+                    {hotel.status.charAt(0).toUpperCase() + hotel.status.slice(1)}
                   </span>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${getApprovalColor(hotel.approvalStatus)}`}>
                     {hotel.approvalStatus}
@@ -396,20 +423,23 @@ export default function SuperAdminHotels() {
                 <div className="flex flex-col space-y-2">
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => handleStatusChange(hotel.id, hotel.status === 'Active' ? 'Suspended' : 'Active')}
+                      onClick={() => handleStatusChange(hotel.id, hotel.status === 'active' ? 'suspended' : 'active')}
+                      disabled={updating === hotel.id}
                       className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium cursor-pointer whitespace-nowrap text-center ${
-                        hotel.status === 'Active'
+                        updating === hotel.id ? 'bg-gray-400' :
+                        hotel.status === 'active'
                           ? 'bg-red-600 text-white hover:bg-red-700'
                           : 'bg-green-600 text-white hover:bg-green-700'
-                      }`}
+                      } disabled:cursor-not-allowed`}
                     >
-                      {hotel.status === 'Active' ? 'Suspend' : 'Activate'}
+                      {updating === hotel.id ? 'Updating...' : (hotel.status === 'active' ? 'Suspend' : 'Activate')}
                     </button>
                     <button
                       onClick={() => handleApprovalChange(hotel.id, 'Approved')}
-                      className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap text-center text-sm"
+                      disabled={updating === hotel.id || hotel.approvalStatus === 'Approved'}
+                      className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap text-center text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
-                      Approve
+                      {updating === hotel.id ? 'Updating...' : 'Approve'}
                     </button>
                   </div>
                   <div className="flex space-x-2">
@@ -418,9 +448,10 @@ export default function SuperAdminHotels() {
                     </Link>
                     <button
                       onClick={() => handleDeleteHotel(hotel.id)}
-                      className="flex-1 bg-red-100 text-red-800 px-3 py-2 rounded-lg hover:bg-red-200 transition-colors cursor-pointer whitespace-nowrap text-center text-sm"
+                      disabled={updating === hotel.id}
+                      className="flex-1 bg-red-100 text-red-800 px-3 py-2 rounded-lg hover:bg-red-200 transition-colors cursor-pointer whitespace-nowrap text-center text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
-                      Delete
+                      {updating === hotel.id ? 'Deleting...' : 'Delete'}
                     </button>
                   </div>
                 </div>

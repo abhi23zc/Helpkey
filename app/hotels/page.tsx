@@ -28,19 +28,23 @@ export default function Hotels() {
         const hotelsCollectionRef = collection(db, 'hotels');
         const data = await getDocs(hotelsCollectionRef);
 
-        const fetchedHotels = data.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id,
-          name: doc.data().name,
-          location: doc.data().location,
-          price: doc.data().price || 0,
-          originalPrice: doc.data().originalPrice || doc.data().price || 0,
-          rating: doc.data().rating || 0,
-          reviews: doc.data().reviews || 0,
-          stars: parseInt(doc.data().stars) || 0,
-          image: doc.data().images && doc.data().images.length > 0 ? doc.data().images[0] : '',
-          amenities: doc.data().amenities || [],
-        }));
+        const fetchedHotels = data.docs
+          .map(doc => ({
+            ...doc.data(),
+            id: doc.id,
+            name: doc.data().name,
+            location: doc.data().location,
+            price: doc.data().price || 0,
+            originalPrice: doc.data().originalPrice || doc.data().price || 0,
+            rating: doc.data().rating || 0,
+            reviews: doc.data().reviews || 0,
+            stars: parseInt(doc.data().stars) || 0,
+            image: doc.data().images && doc.data().images.length > 0 ? doc.data().images[0] : '',
+            amenities: doc.data().amenities || [],
+            approved: doc.data().approved,
+            status: doc.data().status
+          }))
+          .filter(hotel => hotel.approved === true && hotel.status === 'active');
 
         setAllHotels(fetchedHotels);
 
@@ -66,7 +70,6 @@ export default function Hotels() {
 
     fetchHotels();
   }, [searchLocation]);
-
   const handleStarFilter = (stars) => {
     setSelectedStars(prev =>
       prev.includes(stars)
