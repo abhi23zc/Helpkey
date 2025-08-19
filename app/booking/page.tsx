@@ -1,13 +1,16 @@
+
 'use client';
 
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams, useParams, useRouter } from 'next/navigation';
+import type React from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 import { db } from '@/config/firebase';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { useAuth } from '@/context/AuthContext';
 
 interface BookingData {
   hotelId: string;
@@ -20,26 +23,36 @@ interface BookingData {
   hotelDetails: {
     name: string;
     location: string;
-    image?: string;
+    image: string;
   };
   roomDetails: {
     type: string;
     price: number;
-    nights?: number;
+    nights: number;
   };
+}
+
+interface HotelDoc {
+  id: string;
+  name: string;
+  location: string;
+  images?: string[];
+}
+
+interface RoomDoc {
+  id: string;
+  roomType: string;
+  price: number;
+  size?: string;
+  beds?: string;
+  capacity?: number;
+  images?: string[];
 }
 
 function BookingContent() {
   const searchParams = useSearchParams();
-  const params = useParams();
   const router = useRouter();
-
-  // bookingId will be populated from query / params / pathname
-  const [bookingId, setBookingId] = useState<string | null>(null);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -47,7 +60,25 @@ function BookingContent() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [bookingReference, setBookingReference] = useState('');
 
-  const [bookingData, setBookingData] = useState<BookingData | null>(null);
+  const [bookingData, setBookingData] = useState<BookingData>({
+    hotelId: '',
+    roomId: '',
+    checkIn: '',
+    checkOut: '',
+    guests: 2,
+    totalPrice: 0,
+    taxesAndFees: 0,
+    hotelDetails: {
+      name: '',
+      location: '',
+      image: ''
+    },
+    roomDetails: {
+      type: '',
+      price: 0,
+      nights: 0
+    }
+  });
 
   const [guestInfo, setGuestInfo] = useState({
     firstName: '',
@@ -68,83 +99,80 @@ function BookingContent() {
     country: ''
   });
 
-  // Determine bookingId robustly on mount / when route changes
+  const [hotel, setHotel] = useState<HotelDoc | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<RoomDoc | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  
   useEffect(() => {
-    const fromQuery =
-      searchParams?.get('booking') ||
-      searchParams?.get('hotel') ||
-      searchParams?.get('id') ||
-      null;
-
-    if (fromQuery) {
-      setBookingId(fromQuery);
-      return;
-    }
-
-    // Next router params (if using /booking/[id])
-    if ((params as any)?.id) {
-      setBookingId((params as any).id);
-      return;
-    }
-
-    // last resort: parse pathname like /booking/12345
-    if (typeof window !== 'undefined') {
-      const parts = window.location.pathname.split('/').filter(Boolean);
-      const possible = parts.length ? parts[parts.length - 1] : null;
-      // if pathname ends with 'booking' it's not a useful id
-      if (possible && possible.toLowerCase() !== 'booking') {
-        setBookingId(possible);
-        return;
+    const hotelId = searchParams.get('hotel') || '';
+    const roomId = searchParams.get('room') || '';
+    const checkIn = searchParams.get('checkin') || '';
+    const checkOut = searchParams.get('checkout') || '';
+    const guests = parseInt(searchParams.get('guests') || '2');
+    const price = parseInt(searchParams.get('price') || '0');
+    const nights = parseInt(searchParams.get('nights') || '0');
+    const totalPrice = parseInt(searchParams.get('totalPrice') || '0');
+    const taxesAndFees = parseInt(searchParams.get('taxesAndFees') || '0');
+    const hotelName = searchParams.get('hotelName') || '';
+    const roomType = searchParams.get('roomType') || '';
+    const location = searchParams.get('location') || '';
+    const image = searchParams.get('image') || '';
+  
+    setBookingData({
+      hotelId,
+      roomId,
+      checkIn,
+      checkOut,
+      guests,
+      totalPrice,
+      taxesAndFees,
+      hotelDetails: {
+        name: hotelName,
+        location: location,
+        image: image
+      },
+      roomDetails: {
+        type: roomType,
+        price: price,
+        nights: nights
       }
-    }
-
-    // no id found
-    setBookingId(null);
-    setLoading(false);
-  }, [searchParams, params]);
-
-  // Fetch Firestore booking when we have an id
-  useEffect(() => {
-    if (bookingId === null) return; // bookingId explicitly null => we already handled "no id"
-    if (!bookingId) return; // undefined / empty yet
-
-    let mounted = true;
-    const fetchBooking = async () => {
-      setLoading(true);
-      setError(null);
-      console.log('[Booking] fetching bookingId =', bookingId);
-
+    });
+    
+    const fetchDetails = async () => {
+      if (!hotelId || !roomId) return;
       try {
-        const docRef = doc(db, 'bookings', bookingId);
-        const docSnap = await getDoc(docRef);
-        if (!mounted) return;
-        if (docSnap.exists()) {
-          const data = docSnap.data() as BookingData;
-          setBookingData(data);
-          console.log('[Booking] doc found:', data);
-        } else {
-          console.warn('[Booking] booking doc not found for id:', bookingId);
-          setError('Booking not found.');
-          setBookingData(null);
+        setLoadingDetails(true);
+        const hotelSnap = await getDoc(doc(db, 'hotels', hotelId));
+        if (hotelSnap.exists()) {
+          const h = hotelSnap.data() as Omit<HotelDoc, 'id'>;
+          setHotel({ id: hotelSnap.id, ...h });
+        }
+        const roomSnap = await getDoc(doc(db, 'rooms', roomId));
+        if (roomSnap.exists()) {
+          const r = roomSnap.data() as Omit<RoomDoc, 'id'>;
+          setSelectedRoom({ id: roomSnap.id, ...r });
         }
       } catch (err) {
-        console.error('[Booking] error fetching booking:', err);
-        setError('Failed to load booking data.');
+        console.error('Error fetching booking details:', err);
       } finally {
-        if (mounted) setLoading(false);
+        setLoadingDetails(false);
       }
     };
 
-    fetchBooking();
+    fetchDetails();
+  }, [searchParams]);
 
-    return () => {
-      mounted = false;
-    };
-  }, [bookingId]);
+  const displayHotelName = hotel?.name || bookingData.hotelDetails.name || 'Hotel';
+  const displayHotelLocation = hotel?.location || bookingData.hotelDetails.location || '';
+  const displayHotelImage = (hotel?.images && hotel.images[0]) || bookingData.hotelDetails.image || '';
+  const displayRoomType = selectedRoom?.roomType || bookingData.roomDetails.type || 'Room';
+  const displayRoomPrice = (selectedRoom?.price ?? bookingData.roomDetails.price ?? 0);
+  const displayRoomSize = selectedRoom?.size || '';
+  const displayRoomBeds = selectedRoom?.beds || '';
+  const displayRoomCapacity = selectedRoom?.capacity;
+  const displayRoomImage = (selectedRoom?.images && selectedRoom.images[0]) || displayHotelImage;
 
-  // Helper: format and calculate nights
   const calculateNights = () => {
-    if (!bookingData) return 0;
     const checkInDate = new Date(bookingData.checkIn);
     const checkOutDate = new Date(bookingData.checkOut);
     const timeDiff = checkOutDate.getTime() - checkInDate.getTime();
@@ -159,48 +187,6 @@ function BookingContent() {
       day: 'numeric'
     });
   };
-
-  // Add proper null checks and loading states
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Loading Booking</h1>
-            <p className="text-gray-600">Please wait while we load your booking details...</p>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
-  if (error || !bookingData) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <i className="ri-error-warning-line text-2xl text-red-600 w-8 h-8 flex items-center justify-center"></i>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Booking Not Found</h1>
-            <p className="text-gray-600 mb-6">
-              {error || 'We couldn\'t find your booking. Please check the booking reference or try again.'}
-            </p>
-            <Link href="/" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
-              Return to Home
-            </Link>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
 
   const handleGuestInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setGuestInfo({
@@ -218,17 +204,17 @@ function BookingContent() {
 
   const handleNextStep = () => {
     if (currentStep < 3) {
-      setCurrentStep(prev => prev + 1);
+      setCurrentStep(currentStep + 1);
     }
   };
 
   const handlePreviousStep = () => {
     if (currentStep > 1) {
-      setCurrentStep(prev => prev - 1);
+      setCurrentStep(currentStep - 1);
     }
   };
 
-  const handleSubmitBooking = async (e: React.FormEvent) => {
+  const handleSubmitBooking = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     setPaymentProcessing(true);
@@ -248,7 +234,7 @@ function BookingContent() {
       paymentInfo.country
     ];
 
-    if (requiredFields.some(field => !field?.toString().trim())) {
+    if (requiredFields.some(field => !field.trim())) {
       setIsSubmitting(false);
       setPaymentProcessing(false);
       alert('Please fill in all required fields');
@@ -256,18 +242,24 @@ function BookingContent() {
     }
 
     try {
+      // Generate booking reference
       const reference = 'BK' + Date.now().toString().slice(-6);
-
+      
+      // Create booking document in Firestore
       const newBookingData = {
         reference,
-        hotelId: bookingData?.hotelId,
-        roomId: bookingData?.roomId,
-        checkIn: bookingData?.checkIn,
-        checkOut: bookingData?.checkOut,
-        guests: bookingData?.guests,
-        totalPrice: bookingData?.totalPrice,
-        taxesAndFees: bookingData?.taxesAndFees,
-        totalAmount: (bookingData?.totalPrice || 0) + (bookingData?.taxesAndFees || 0),
+        hotelId: bookingData.hotelId,
+        roomId: bookingData.roomId,
+        userId: user?.uid || null,
+        userEmail: guestInfo.email,
+        checkIn: bookingData.checkIn,
+        checkOut: bookingData.checkOut,
+        guests: bookingData.guests,
+        totalPrice: bookingData.totalPrice,
+        taxesAndFees: bookingData.taxesAndFees,
+        totalAmount: bookingData.totalPrice + bookingData.taxesAndFees,
+        nights: bookingData.roomDetails.nights || calculateNights(),
+        unitPrice: displayRoomPrice,
         guestInfo: {
           firstName: guestInfo.firstName,
           lastName: guestInfo.lastName,
@@ -277,6 +269,7 @@ function BookingContent() {
         },
         paymentInfo: {
           cardholderName: paymentInfo.cardholderName,
+          // Store only last 4 digits of card number for security
           lastFourDigits: paymentInfo.cardNumber.slice(-4),
           billingAddress: paymentInfo.billingAddress,
           city: paymentInfo.city,
@@ -286,32 +279,39 @@ function BookingContent() {
         status: 'confirmed',
         createdAt: serverTimestamp(),
         hotelDetails: {
-          name: bookingData?.hotelDetails.name || '',
-          location: bookingData?.hotelDetails.location || ''
+          name: displayHotelName,
+          location: displayHotelLocation,
+          image: displayHotelImage
         },
         roomDetails: {
-          type: bookingData?.roomDetails.type || '',
-          price: bookingData?.roomDetails.price || 0
+          type: displayRoomType,
+          price: displayRoomPrice,
+          size: displayRoomSize,
+          beds: displayRoomBeds,
+          image: displayRoomImage
         }
       };
-
+  
+      // Add to Firestore
       const bookingsRef = collection(db, 'bookings');
       await addDoc(bookingsRef, newBookingData);
-
+  
+      // Update UI states
       setBookingReference(reference);
       setPaymentProcessing(false);
       setPaymentSuccess(true);
-
+  
       setTimeout(() => {
         setIsSubmitting(false);
         setShowSuccess(true);
-
+  
         setTimeout(() => {
           router.push('/bookings');
         }, 3000);
       }, 1000);
-    } catch (err) {
-      console.error('Error creating booking:', err);
+  
+    } catch (error) {
+      console.error('Error creating booking:', error);
       setIsSubmitting(false);
       setPaymentProcessing(false);
       alert('There was an error processing your booking. Please try again.');
@@ -405,11 +405,11 @@ function BookingContent() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Hotel:</span>
-                  <span className="font-medium">{bookingData.hotelDetails.name}</span>
+                  <span className="font-medium">{displayHotelName}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Room:</span>
-                  <span className="font-medium">{bookingData.roomDetails.type}</span>
+                  <span className="font-medium">{displayRoomType}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Check-in:</span>
@@ -425,7 +425,7 @@ function BookingContent() {
                 </div>
                 <div className="flex justify-between border-t pt-2">
                   <span className="text-gray-600">Total Paid:</span>
-                  <span className="font-bold text-lg">₹{bookingData.totalPrice + bookingData.taxesAndFees}</span>
+                  <span className="font-bold text-lg">${bookingData.totalPrice + bookingData.taxesAndFees}</span>
                 </div>
               </div>
             </div>
@@ -442,6 +442,9 @@ function BookingContent() {
               <Link href="/bookings" className="block w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap">
                 View My Bookings
               </Link>
+              <Link href="/" className="block w-full border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap">
+                Back to Home
+              </Link>
             </div>
           </div>
         </div>
@@ -453,7 +456,8 @@ function BookingContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-center space-x-4">
@@ -491,19 +495,16 @@ function BookingContent() {
                 <div className="flex flex-col md:flex-row gap-6 mb-6">
                   <div className="md:w-1/3">
                     <img
-                      src={bookingData.hotelDetails.image || '/placeholder-hotel.jpg'}
-                      alt={bookingData.hotelDetails.name}
+                      src={displayHotelImage}
+                      alt={displayHotelName}
                       className="w-full h-48 object-cover object-top rounded-lg"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/placeholder-hotel.jpg';
-                      }}
                     />
                   </div>
                   <div className="md:w-2/3">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{bookingData.hotelDetails.name}</h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{displayHotelName}</h3>
                     <p className="text-gray-600 flex items-center mb-4">
                       <i className="ri-map-pin-line mr-2 w-4 h-4 flex items-center justify-center"></i>
-                      {bookingData.hotelDetails.location}
+                      {displayHotelLocation}
                     </p>
 
                     <div className="grid grid-cols-2 gap-4 mb-4">
@@ -531,20 +532,17 @@ function BookingContent() {
                   <h4 className="font-semibold text-gray-900 mb-4">Selected Room</h4>
                   <div className="flex gap-4">
                     <img
-                      src={bookingData.hotelDetails.image || '/placeholder-room.jpg'}
-                      alt={bookingData.roomDetails.type}
+                      src={displayRoomImage}
+                      alt={displayRoomType}
                       className="w-24 h-24 object-cover object-top rounded-lg"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/placeholder-room.jpg';
-                      }}
                     />
                     <div className="flex-1">
-                      <h5 className="font-semibold text-gray-900">{bookingData.roomDetails.type}</h5>
-                      <p className="text-sm text-gray-600">₹{bookingData.roomDetails.price} per night</p>
-                      <p className="text-sm text-gray-600">{calculateNights()} nights</p>
+                      <h5 className="font-semibold text-gray-900">{displayRoomType}</h5>
+                      <p className="text-sm text-gray-600">{displayRoomSize} {displayRoomSize && displayRoomBeds ? '•' : ''} {displayRoomBeds}</p>
+                      <p className="text-sm text-gray-600">{displayRoomCapacity ? `Up to ${displayRoomCapacity} guests` : ''}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-blue-600">₹{bookingData.roomDetails.price}</p>
+                      <p className="text-lg font-bold text-blue-600">${displayRoomPrice}</p>
                       <p className="text-sm text-gray-600">per night</p>
                     </div>
                   </div>
@@ -558,7 +556,8 @@ function BookingContent() {
                     Continue to Guest Info
                   </button>
                 </div>
-              )}
+              </div>
+            )}
 
               {currentStep === 2 && (
               <div className="bg-white rounded-lg shadow-sm p-6">
@@ -567,9 +566,7 @@ function BookingContent() {
                 <form className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        First Name *
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
                       <input
                         type="text"
                         name="firstName"
@@ -581,9 +578,7 @@ function BookingContent() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Last Name *
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
                       <input
                         type="text"
                         name="lastName"
@@ -595,48 +590,41 @@ function BookingContent() {
                       />
                     </div>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email Address *
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={guestInfo.email}
-                      onChange={handleGuestInfoChange}
-                      required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="john.doe@example.com"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={guestInfo.email}
+                        onChange={handleGuestInfoChange}
+                        required
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="john@example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={guestInfo.phone}
+                        onChange={handleGuestInfoChange}
+                        required
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="+1 555 123 4567"
+                      />
+                    </div>
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number *
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={guestInfo.phone}
-                      onChange={handleGuestInfoChange}
-                      required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="+91 98765 43210"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Special Requests (Optional)
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Special Requests</label>
                     <textarea
                       name="specialRequests"
                       value={guestInfo.specialRequests}
                       onChange={handleGuestInfoChange}
                       rows={4}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Any special requests or preferences..."
+                      placeholder="Any special needs or preferences"
                     />
                   </div>
                 </form>
@@ -789,84 +777,135 @@ function BookingContent() {
                         value={paymentInfo.country}
                         onChange={handlePaymentInfoChange}
                         required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
                       >
                         <option value="">Select Country</option>
                         <option value="US">United States</option>
-                        <option value="IN">India</option>
-                        <option value="UK">United Kingdom</option>
                         <option value="CA">Canada</option>
+                        <option value="UK">United Kingdom</option>
                         <option value="AU">Australia</option>
+                        <option value="DE">Germany</option>
+                        <option value="FR">France</option>
+                        <option value="JP">Japan</option>
+                        <option value="Other">Other</option>
                       </select>
                     </div>
                   </div>
-                </form>
 
-                <div className="mt-6 flex justify-between">
-                  <button
-                    onClick={handlePreviousStep}
-                    className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    onClick={handleSubmitBooking}
-                    disabled={isSubmitting}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSubmitting ? 'Processing...' : 'Complete Booking'}
-                  </button>
-                </div>
+                  <div className="border-t pt-6">
+                    <div className="flex items-center mb-4">
+                      <input
+                        type="checkbox"
+                        id="terms"
+                        required
+                        className="mr-2"
+                      />
+                      <label htmlFor="terms" className="text-sm text-gray-700">
+                        I agree to the <a href="#" className="text-blue-600 hover:underline">Terms & Conditions</a> and <a href="#" className="text-blue-600 hover:underline">Privacy Policy</a>
+                      </label>
+                    </div>
+                    <div className="flex items-center mb-4">
+                      <input
+                        type="checkbox"
+                        id="marketing"
+                        className="mr-2"
+                      />
+                      <label htmlFor="marketing" className="text-sm text-gray-700">
+                        I would like to receive promotional emails about special offers
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-between">
+                    <button
+                      type="button"
+                      onClick={handlePreviousStep}
+                      className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition-colors cursor-pointer whitespace-nowrap flex items-center"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <i className="ri-secure-payment-line mr-2 w-4 h-4 flex items-center justify-center"></i>
+                          Complete Booking
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
               </div>
             )}
           </div>
 
-          {/* Sidebar */}
+          {/* Booking Summary Sidebar */}
           <div className="lg:w-1/3">
-            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
+            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Booking Summary</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-gray-600">Hotel</p>
-                  <p className="font-medium">{bookingData.hotelDetails.name}</p>
+
+              <div className="space-y-4 mb-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Room Rate</span>
+                  <span className="font-medium">${displayRoomPrice} x {calculateNights()} nights</span>
                 </div>
-                
-                <div>
-                  <p className="text-sm text-gray-600">Room Type</p>
-                  <p className="font-medium">{bookingData.roomDetails.type}</p>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Subtotal</span>
+                  <span className="font-medium">${bookingData.totalPrice}</span>
                 </div>
-                
-                <div>
-                  <p className="text-sm text-gray-600">Check-in / Check-out</p>
-                  <p className="font-medium">{formatDate(bookingData.checkIn)} - {formatDate(bookingData.checkOut)}</p>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Taxes & Fees</span>
+                  <span className="font-medium">${bookingData.taxesAndFees}</span>
                 </div>
-                
-                <div>
-                  <p className="text-sm text-gray-600">Guests</p>
-                  <p className="font-medium">{bookingData.guests} guests</p>
-                </div>
-                
-                <div>
-                  <p className="text-sm text-gray-600">Nights</p>
-                  <p className="font-medium">{calculateNights()} nights</p>
-                </div>
-                
                 <div className="border-t pt-4">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-600">Room Rate</span>
-                    <span>₹{bookingData.roomDetails.price} × {calculateNights()} nights</span>
-                  </div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-600">Taxes & Fees</span>
-                    <span>₹{bookingData.taxesAndFees}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                    <span>Total</span>
-                    <span>₹{bookingData.totalPrice + bookingData.taxesAndFees}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-gray-900">Total</span>
+                    <span className="text-xl font-bold text-blue-600">${bookingData.totalPrice + bookingData.taxesAndFees}</span>
                   </div>
                 </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Booking Details</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Check-in:</span>
+                    <span className="font-medium">{formatDate(bookingData.checkIn)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Check-out:</span>
+                    <span className="font-medium">{formatDate(bookingData.checkOut)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Guests:</span>
+                    <span className="font-medium">{bookingData.guests} guests</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Room:</span>
+                    <span className="font-medium">{displayRoomType}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                <div className="flex items-center text-blue-700 mb-2">
+                  <i className="ri-information-line mr-2 w-4 h-4 flex items-center justify-center"></i>
+                  <span className="font-medium">Important Information</span>
+                </div>
+                <ul className="text-sm text-blue-600 space-y-1">
+                  <li>• Free cancellation until 24 hours before check-in</li>
+                  <li>• Valid ID required at check-in</li>
+                  <li>• Booking confirmation will be sent to your email</li>
+                  <li>• No hidden fees - total price includes all charges</li>
+                </ul>
               </div>
             </div>
           </div>

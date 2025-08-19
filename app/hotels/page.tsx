@@ -8,17 +8,33 @@ import { db } from '@/config/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { useSearchParams } from 'next/navigation';
 
-export default function Hotels() {
+interface HotelItem {
+  id: string;
+  name: string;
+  location: string;
+  address?: string;
+  price: number;
+  originalPrice: number;
+  rating: number;
+  reviews: number;
+  stars: number;
+  image: string;
+  amenities: string[];
+  approved: boolean;
+  status: string;
+}
+
+function HotelsContent() {
   const searchParams = useSearchParams();
   const searchLocation = searchParams.get('location') || '';
 
-  const [hotels, setHotels] = useState([]);
-  const [allHotels, setAllHotels] = useState([]);
+  const [hotels, setHotels] = useState<HotelItem[]>([]);
+  const [allHotels, setAllHotels] = useState<HotelItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [priceRange, setPriceRange] = useState([0, 500]);
-  const [selectedStars, setSelectedStars] = useState([]);
-  const [selectedAmenities, setSelectedAmenities] = useState([]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
+  const [selectedStars, setSelectedStars] = useState<number[]>([]);
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState('recommended');
 
   useEffect(() => {
@@ -28,21 +44,22 @@ export default function Hotels() {
         const hotelsCollectionRef = collection(db, 'hotels');
         const data = await getDocs(hotelsCollectionRef);
 
-        const fetchedHotels = data.docs
+        const fetchedHotels: HotelItem[] = data.docs
           .map(doc => ({
-            ...doc.data(),
+            ...(doc.data() as any),
             id: doc.id,
-            name: doc.data().name,
-            location: doc.data().location,
-            price: doc.data().price || 0,
-            originalPrice: doc.data().originalPrice || doc.data().price || 0,
-            rating: doc.data().rating || 0,
-            reviews: doc.data().reviews || 0,
-            stars: parseInt(doc.data().stars) || 0,
-            image: doc.data().images && doc.data().images.length > 0 ? doc.data().images[0] : '',
-            amenities: doc.data().amenities || [],
-            approved: doc.data().approved,
-            status: doc.data().status
+            name: (doc.data() as any).name,
+            location: (doc.data() as any).location,
+            address: (doc.data() as any).address,
+            price: (doc.data() as any).price || 0,
+            originalPrice: (doc.data() as any).originalPrice || (doc.data() as any).price || 0,
+            rating: (doc.data() as any).rating || 0,
+            reviews: (doc.data() as any).reviews || 0,
+            stars: parseInt((doc.data() as any).stars) || 0,
+            image: (doc.data() as any).images && (doc.data() as any).images.length > 0 ? (doc.data() as any).images[0] : '',
+            amenities: (doc.data() as any).amenities || [],
+            approved: (doc.data() as any).approved,
+            status: (doc.data() as any).status
           }))
           .filter(hotel => hotel.approved === true && hotel.status === 'active');
 
@@ -70,7 +87,7 @@ export default function Hotels() {
 
     fetchHotels();
   }, [searchLocation]);
-  const handleStarFilter = (stars) => {
+  const handleStarFilter = (stars: number) => {
     setSelectedStars(prev =>
       prev.includes(stars)
         ? prev.filter(s => s !== stars)
@@ -78,7 +95,7 @@ export default function Hotels() {
     );
   };
 
-  const handleAmenityFilter = (amenity) => {
+  const handleAmenityFilter = (amenity: string) => {
     setSelectedAmenities(prev =>
       prev.includes(amenity)
         ? prev.filter(a => a !== amenity)
@@ -99,7 +116,7 @@ export default function Hotels() {
                 {searchLocation ? `Hotels in ${searchLocation}` : 'All Hotels'}
               </h1>
               <p className="text-gray-600">
-                {searchLocation ? `Searching for "${searchLocation}"` : 'Showing all available hotels'}
+                {searchLocation ? `Searching for \"${searchLocation}\"` : 'Showing all available hotels'}
               </p>
             </div>
             <button
@@ -282,5 +299,13 @@ export default function Hotels() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function Hotels() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div><p className="text-gray-600">Loading hotels...</p></div></div>}>
+      <HotelsContent />
+    </Suspense>
   );
 }

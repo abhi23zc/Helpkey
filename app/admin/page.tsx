@@ -1,63 +1,209 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { db } from '@/config/firebase';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { useAuth } from '@/context/AuthContext';
+
+interface Stats {
+  totalHotels: number;
+  totalRooms: number;
+  totalBookings: number;
+  activeBookings: number;
+  revenue: number;
+  occupancyRate: number;
+}
+
+interface RecentBooking {
+  id: string;
+  reference: string;
+  hotelName: string;
+  guestName: string;
+  checkIn: string;
+  checkOut: string;
+  status: string;
+  amount: number;
+}
 
 export default function AdminDashboard() {
+  const { user, userData } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+  const [stats, setStats] = useState<Stats>({
+    totalHotels: 0,
+    totalRooms: 0,
+    totalBookings: 0,
+    activeBookings: 0,
+    revenue: 0,
+    occupancyRate: 0
+  });
+  const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const stats = {
-    totalHotels: 12,
-    totalRooms: 156,
-    totalBookings: 2847,
-    activeBookings: 234,
-    revenue: 485750,
-    occupancyRate: 78.5
-  };
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user || userData?.role !== 'admin') return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch hotels count
+        const hotelsSnapshot = await getDocs(collection(db, 'hotels'));
+        const totalHotels = hotelsSnapshot.size;
 
-  const recentBookings = [
-    {
-      id: 1,
-      bookingRef: "BK001234",
-      hotelName: "Grand Luxury Resort",
-      guestName: "John Smith",
-      checkIn: "2024-03-15",
-      checkOut: "2024-03-20",
-      status: "Confirmed",
-      amount: 1495
-    },
-    {
-      id: 2,
-      bookingRef: "BK001235",
-      hotelName: "City Center Business Hotel",
-      guestName: "Sarah Johnson",
-      checkIn: "2024-04-10",
-      checkOut: "2024-04-12",
-      status: "Confirmed",
-      amount: 378
-    },
-    {
-      id: 3,
-      bookingRef: "BK001236",
-      hotelName: "Boutique Garden Hotel",
-      guestName: "Michael Chen",
-      checkIn: "2024-03-22",
-      checkOut: "2024-03-25",
-      status: "Pending",
-      amount: 675
-    }
-  ];
+        // Fetch rooms count
+        const roomsSnapshot = await getDocs(collection(db, 'rooms'));
+        const totalRooms = roomsSnapshot.size;
+
+        // Fetch all bookings
+        const bookingsSnapshot = await getDocs(collection(db, 'bookings'));
+        const totalBookings = bookingsSnapshot.size;
+
+        // Calculate active bookings and revenue
+        let activeBookings = 0;
+        let totalRevenue = 0;
+        const today = new Date();
+        
+        bookingsSnapshot.forEach(doc => {
+          const data = doc.data();
+          const status = (data.status || '').toLowerCase();
+          const checkIn = new Date(data.checkIn);
+          const checkOut = new Date(data.checkOut);
+          
+          // Active booking: confirmed status and check-in date is in the future
+          if (status === 'confirmed' && checkIn > today) {
+            activeBookings++;
+          }
+          
+          // Add to revenue if booking is confirmed or completed
+          if (status === 'confirmed' || status === 'completed') {
+            totalRevenue += data.totalAmount || 0;
+          }
+        });
+
+        // Calculate occupancy rate (simplified - based on active bookings vs total rooms)
+        const occupancyRate = totalRooms > 0 ? Math.round((activeBookings / totalRooms) * 100) : 0;
+
+        setStats({
+          totalHotels,
+          totalRooms,
+          totalBookings,
+          activeBookings,
+          revenue: totalRevenue,
+          occupancyRate
+        });
+
+        // Fetch recent bookings
+        const recentBookingsQuery = query(
+          collection(db, 'bookings'),
+          orderBy('createdAt', 'desc'),
+          limit(5)
+        );
+        
+        const recentBookingsSnapshot = await getDocs(recentBookingsQuery);
+        const recentBookingsData: RecentBooking[] = recentBookingsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            reference: data.reference || 'N/A',
+            hotelName: data.hotelDetails?.name || 'Hotel',
+            guestName: `${data.guestInfo?.firstName || ''} ${data.guestInfo?.lastName || ''}`.trim() || 'Guest',
+            checkIn: data.checkIn || '',
+            checkOut: data.checkOut || '',
+            status: data.status || 'Unknown',
+            amount: data.totalAmount || 0
+          };
+        });
+
+        setRecentBookings(recentBookingsData);
+
+      } catch (err: any) {
+        console.error('Error fetching dashboard data:', err);
+        setError(err.message || 'Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [user, userData]);
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Confirmed': return 'bg-green-100 text-green-800';
-      case 'Pending': return 'bg-yellow-100 text-yellow-800';
-      case 'Cancelled': return 'bg-red-100 text-red-800';
+    switch (status.toLowerCase()) {
+      case 'confirmed': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      case 'completed': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Check if user is admin
+  if (!user || userData?.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+          <div className="bg-white rounded-lg shadow-sm p-8">
+            <i className="ri-shield-check-line text-6xl text-red-500 mb-4 w-16 h-16 flex items-center justify-center mx-auto"></i>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
+            <p className="text-gray-600 mb-6">You don't have permission to access the admin dashboard.</p>
+            <Link href="/" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+              Return to Home
+            </Link>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+          <div className="bg-white rounded-lg shadow-sm p-8">
+            <i className="ri-error-warning-line text-6xl text-red-500 mb-4 w-16 h-16 flex items-center justify-center mx-auto"></i>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Dashboard</h1>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -189,25 +335,35 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-gray-50 rounded-lg p-6">
                     <h3 className="text-lg font-semibold mb-4">Recent Bookings</h3>
-                    <div className="space-y-3">
-                      {recentBookings.map(booking => (
-                        <div key={booking.id} className="bg-white rounded-lg p-4 border border-gray-200">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <p className="font-medium text-gray-900">{booking.bookingRef}</p>
-                              <p className="text-sm text-gray-600">{booking.hotelName}</p>
+                    {recentBookings.length > 0 ? (
+                      <div className="space-y-3">
+                        {recentBookings.map(booking => (
+                          <div key={booking.id} className="bg-white rounded-lg p-4 border border-gray-200">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <p className="font-medium text-gray-900">{booking.reference}</p>
+                                <p className="text-sm text-gray-600">{booking.hotelName}</p>
+                              </div>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
+                                {booking.status}
+                              </span>
                             </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
-                              {booking.status}
-                            </span>
+                            <div className="flex justify-between items-center text-sm text-gray-600">
+                              <span>{booking.guestName}</span>
+                              <span className="font-medium text-gray-900">${booking.amount}</span>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {formatDate(booking.checkIn)} - {formatDate(booking.checkOut)}
+                            </div>
                           </div>
-                          <div className="flex justify-between items-center text-sm text-gray-600">
-                            <span>{booking.guestName}</span>
-                            <span className="font-medium text-gray-900">${booking.amount}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <i className="ri-calendar-line text-4xl mb-2 w-12 h-12 flex items-center justify-center mx-auto"></i>
+                        <p>No recent bookings</p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="bg-gray-50 rounded-lg p-6">
