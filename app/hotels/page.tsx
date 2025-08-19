@@ -276,9 +276,9 @@ function HotelsContent() {
                         <Link href={`/hotels/${hotel.id}`} className="text-blue-600 hover:text-blue-700 font-medium cursor-pointer whitespace-nowrap">
                           View Details
                         </Link>
-                        <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap">
+                        <Link href={`/hotels/${hotel.id}`} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap">
                           Book Now
-                        </button>
+                        </Link>
                       </div>
                     </div>
                   </div>
