@@ -276,7 +276,7 @@ function BookingContent() {
           zipCode: paymentInfo.zipCode,
           country: paymentInfo.country
         },
-        status: 'confirmed',
+        status: 'pending',
         createdAt: serverTimestamp(),
         hotelDetails: {
           name: displayHotelName,

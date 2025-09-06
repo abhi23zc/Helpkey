@@ -6,8 +6,22 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import EditHotelModal from '@/components/EditHotelModal';
 import { db } from '@/config/firebase';
-import { collection, getDocs, query, where, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
+
+function formatDate(date: Date | string | undefined) {
+  if (!date) return 'N/A';
+  try {
+    if (typeof date === 'string') {
+      // Try to parse ISO string
+      const d = new Date(date);
+      return d.toLocaleString();
+    }
+    return date.toLocaleString();
+  } catch {
+    return 'N/A';
+  }
+}
 
 export default function HotelManagement() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,15 +44,19 @@ export default function HotelManagement() {
           where('hotelAdmin', '==', user?.uid)
         );
         const querySnapshot = await getDocs(hotelsQuery);
-        
-        const hotelsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          // Convert Firestore Timestamp to Date if needed
-          createdAt: doc.data().createdAt?.toDate?.() || new Date(),
-          updatedAt: doc.data().updatedAt?.toDate?.() || new Date()
-        }));
-        
+
+        const hotelsData = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate?.() || data.createdAt || null,
+            updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || null,
+            addedAt: data.addedAt || null,
+            stars: typeof data.stars === 'string' ? parseInt(data.stars) : data.stars,
+          };
+        });
+
         setHotels(hotelsData);
       } catch (error) {
         console.error('Error fetching hotels:', error);
@@ -48,7 +66,7 @@ export default function HotelManagement() {
     };
 
     fetchHotels();
-  }, []);
+  }, [user?.uid]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -71,15 +89,10 @@ export default function HotelManagement() {
 
   const confirmDelete = async () => {
     if (!hotelToDelete) return;
-    
+
     try {
-      // Delete the hotel document from Firestore
       await deleteDoc(doc(db, 'hotels', hotelToDelete.id));
-      
-      // Update the local state to remove the deleted hotel
       setHotels(hotels.filter(hotel => hotel.id !== hotelToDelete.id));
-      
-      // Close the confirmation dialog
       setShowDeleteConfirm(false);
       setHotelToDelete(null);
     } catch (error) {
@@ -94,8 +107,10 @@ export default function HotelManagement() {
   };
 
   const filteredHotels = hotels.filter(hotel => {
-    const matchesSearch = hotel.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         hotel.location?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch =
+      hotel.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      hotel.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      hotel.address?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterBy === 'all' || hotel.status?.toLowerCase() === filterBy.toLowerCase();
     return matchesSearch && matchesFilter;
   });
@@ -149,7 +164,7 @@ export default function HotelManagement() {
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by name or location..."
+                  placeholder="Search by name, location, or address..."
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
@@ -216,42 +231,56 @@ export default function HotelManagement() {
                       {hotel.status || 'Unknown'}
                     </span>
                   </div>
+                  {hotel.approved === false && (
+                    <div className="absolute top-4 left-4">
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        Not Approved
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="text-lg font-semibold text-gray-900">{hotel.name}</h3>
                     <div className="flex items-center">
-                      {[...Array(hotel.stars || 0)].map((_, i) => (
+                      {[...Array(Number(hotel.stars) || 0)].map((_, i) => (
                         <i key={i} className="ri-star-fill text-yellow-400 text-sm w-4 h-4 flex items-center justify-center"></i>
                       ))}
                     </div>
                   </div>
 
-                  <p className="text-gray-600 flex items-center mb-4">
+                  <p className="text-gray-600 flex items-center mb-2">
                     <i className="ri-map-pin-line mr-2 w-4 h-4 flex items-center justify-center"></i>
                     {hotel.location}
                   </p>
-
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <p className="text-sm text-gray-500">Rooms</p>
-                      <p className="text-lg font-semibold text-gray-900">{hotel.rooms || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Occupancy</p>
-                      <p className="text-lg font-semibold text-gray-900">{hotel.occupancy ? `${hotel.occupancy}%` : 'N/A'}</p>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <p className="text-sm text-gray-500">Monthly Revenue</p>
-                    <p className="text-lg font-semibold text-green-600">
-                      {hotel.revenue ? `$${hotel.revenue.toLocaleString()}` : 'N/A'}
+                  {hotel.address && (
+                    <p className="text-gray-500 flex items-center mb-2">
+                      <i className="ri-building-line mr-2 w-4 h-4 flex items-center justify-center"></i>
+                      {hotel.address}
                     </p>
+                  )}
+
+        
+
+              
+             
+
+                  {/* Amenities */}
+                  <div className="mb-2">
+                    <p className="text-sm text-gray-500">Amenities</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {Array.isArray(hotel.amenities) && hotel.amenities.length > 0 ? (
+                        hotel.amenities.map((amenity: string, idx: number) => (
+                          <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">{amenity}</span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 text-xs">No amenities listed</span>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-2 mt-4">
                     <Link href={`/hotels/${hotel.id}`} className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap text-center text-sm">
                       View Details
                     </Link>

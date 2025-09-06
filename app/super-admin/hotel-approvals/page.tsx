@@ -1,110 +1,89 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { collection, getDocs, query, orderBy, updateDoc, doc, where } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+
+interface HotelData {
+  id: string;
+  name: string;
+  location: string;
+  address: string;
+  email: string;
+  phone: string;
+  hotelAdmin: string;
+  description: string;
+  stars: string;
+  amenities: string[];
+  images: string[];
+  policies: {
+    cancellation: string;
+    checkIn: string;
+    checkOut: string;
+    pets: boolean;
+    smoking: boolean;
+  };
+  approved: boolean;
+  status: string;
+  createdAt: any;
+  updatedAt: any;
+  addedAt: string;
+  // Additional fields for approval workflow
+  approvedBy?: string;
+  approvedDate?: string;
+  rejectedBy?: string;
+  rejectedDate?: string;
+  rejectionReason?: string;
+  priority?: string;
+}
 
 export default function HotelApprovals() {
   const [selectedTab, setSelectedTab] = useState('pending');
+  const [hotels, setHotels] = useState<HotelData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const pendingApprovals = [
-    {
-      id: 1,
-      hotelName: "Oceanfront Paradise Resort",
-      location: "Malibu, California",
-      owner: "David Wilson",
-      ownerEmail: "david.wilson@email.com",
-      submittedDate: "2024-03-08",
-      rooms: 52,
-      stars: 5,
-      description: "A luxury oceanfront resort featuring private beach access, world-class spa facilities, and premium accommodations with stunning Pacific Ocean views.",
-      images: [
-        "https://readdy.ai/api/search-image?query=Luxury%20oceanfront%20resort%20hotel%20with%20private%20beach%2C%20infinity%20pool%2C%20palm%20trees%2C%20tropical%20paradise%2C%20premium%20accommodation%2C%20stunning%20ocean%20views%2C%20five%20star%20service%2C%20modern%20architecture&width=400&height=300&seq=approval-1-1&orientation=landscape",
-        "https://readdy.ai/api/search-image?query=Resort%20hotel%20lobby%20with%20elegant%20decor%2C%20marble%20floors%2C%20crystal%20chandeliers%2C%20luxury%20furnishings%2C%20sophisticated%20interior%20design%2C%20five%20star%20accommodation%2C%20premium%20hospitality&width=400&height=300&seq=approval-1-2&orientation=landscape"
-      ],
-      amenities: ["Private Beach Access", "Infinity Pool", "Spa & Wellness", "Fine Dining", "Concierge Service", "Valet Parking"],
-      requestType: "New Hotel Registration",
-      status: "Pending Review",
-      priority: "High"
-    },
-    {
-      id: 2,
-      hotelName: "Historic Downtown Inn",
-      location: "Boston, Massachusetts",
-      owner: "Lisa Anderson",
-      ownerEmail: "lisa.anderson@email.com",
-      submittedDate: "2024-03-10",
-      rooms: 24,
-      stars: 3,
-      description: "A charming historic inn located in the heart of downtown Boston, featuring restored 19th-century architecture and modern amenities.",
-      images: [
-        "https://readdy.ai/api/search-image?query=Historic%20boutique%20hotel%20in%20downtown%20area%2C%20classic%20architecture%2C%20restored%20building%2C%20traditional%20charm%2C%20urban%20location%2C%20heritage%20design%2C%20cozy%20atmosphere%2C%20three%20star%20accommodation&width=400&height=300&seq=approval-2-1&orientation=landscape",
-        "https://readdy.ai/api/search-image?query=Historic%20hotel%20interior%20with%20classic%20decor%2C%20vintage%20furnishings%2C%20traditional%20design%2C%20elegant%20atmosphere%2C%20heritage%20building%2C%20boutique%20accommodation%2C%20refined%20ambiance&width=400&height=300&seq=approval-2-2&orientation=landscape"
-      ],
-      amenities: ["Free WiFi", "Business Center", "Continental Breakfast", "Pet Friendly", "Fitness Center"],
-      requestType: "Hotel Update Review",
-      status: "Under Review",
-      priority: "Medium"
-    },
-    {
-      id: 3,
-      hotelName: "Mountain Peak Resort",
-      location: "Jackson Hole, Wyoming",
-      owner: "Robert Taylor",
-      ownerEmail: "robert.taylor@email.com",
-      submittedDate: "2024-03-12",
-      rooms: 67,
-      stars: 4,
-      description: "A premier mountain resort offering year-round outdoor activities, luxury accommodations, and breathtaking views of the Teton Range.",
-      images: [
-        "https://readdy.ai/api/search-image?query=Mountain%20resort%20hotel%20with%20stunning%20mountain%20views%2C%20alpine%20architecture%2C%20luxury%20accommodations%2C%20ski%20resort%2C%20natural%20setting%2C%20four%20star%20service%2C%20outdoor%20activities&width=400&height=300&seq=approval-3-1&orientation=landscape",
-        "https://readdy.ai/api/search-image?query=Mountain%20resort%20lobby%20with%20rustic%20luxury%20decor%2C%20stone%20fireplace%2C%20wooden%20beams%2C%20cozy%20atmosphere%2C%20alpine%20design%2C%20premium%20mountain%20accommodation&width=400&height=300&seq=approval-3-2&orientation=landscape"
-      ],
-      amenities: ["Ski-in/Ski-out", "Mountain View", "Spa Services", "Restaurant", "Outdoor Pool", "Fitness Center"],
-      requestType: "New Hotel Registration",
-      status: "Pending Review",
-      priority: "High"
+  // Fetch hotels from Firestore
+  const fetchHotels = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+      const q = query(
+        collection(db, 'hotels'),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const hotelsData: HotelData[] = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as HotelData));
+      setHotels(hotelsData);
+    } catch (err) {
+      console.error('Error fetching hotels:', err);
+      setError('Failed to load hotels. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-  ];
+  };
 
-  const approvedHotels = [
-    {
-      id: 4,
-      hotelName: "Grand Luxury Resort",
-      location: "Miami Beach, Florida",
-      owner: "John Smith",
-      approvedDate: "2024-01-15",
-      approvedBy: "Super Admin",
-      status: "Approved",
-      revenue: 125000,
-      commission: 12500
-    },
-    {
-      id: 5,
-      hotelName: "City Center Business Hotel",
-      location: "Downtown Manhattan, New York",
-      owner: "Sarah Johnson",
-      approvedDate: "2024-02-20",
-      approvedBy: "Super Admin",
-      status: "Approved",
-      revenue: 198000,
-      commission: 19800
-    }
-  ];
+  useEffect(() => {
+    fetchHotels();
+  }, []);
 
-  const rejectedHotels = [
-    {
-      id: 6,
-      hotelName: "Budget Motel Chain",
-      location: "Generic Location",
-      owner: "Rejected Owner",
-      rejectedDate: "2024-03-01",
-      rejectedBy: "Super Admin",
-      reason: "Does not meet quality standards and documentation requirements",
-      status: "Rejected"
-    }
-  ];
+  // Filter hotels based on approval status
+  const pendingApprovals = hotels.filter(hotel => !hotel.approved && hotel.status === 'active');
+  const approvedHotels = hotels.filter(hotel => hotel.approved);
+  const rejectedHotels = hotels.filter(hotel => hotel.status === 'rejected');
+
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -125,20 +104,61 @@ export default function HotelApprovals() {
     }
   };
 
-  const handleApprove = (hotelId: number) => {
-    console.log(`Approving hotel ${hotelId}`);
-    alert('Hotel approved successfully!');
-  };
-
-  const handleReject = (hotelId: number) => {
-    const reason = prompt('Please provide a reason for rejection:');
-    if (reason) {
-      console.log(`Rejecting hotel ${hotelId} with reason: ${reason}`);
-      alert('Hotel rejected successfully!');
+  const handleApprove = async (hotelId: string) => {
+    try {
+      await updateDoc(doc(db, 'hotels', hotelId), {
+        approved: true,
+        approvedBy: 'Super Admin',
+        approvedDate: new Date().toISOString(),
+        updatedAt: new Date()
+      });
+      
+      setHotels(prev => prev.map(hotel => 
+        hotel.id === hotelId 
+          ? { ...hotel, approved: true, approvedBy: 'Super Admin', approvedDate: new Date().toISOString() }
+          : hotel
+      ));
+      
+      alert('Hotel approved successfully!');
+    } catch (error) {
+      console.error('Error approving hotel:', error);
+      alert('Failed to approve hotel');
     }
   };
 
-  const handleRequestMoreInfo = (hotelId: number) => {
+  const handleReject = async (hotelId: string) => {
+    const reason = prompt('Please provide a reason for rejection:');
+    if (reason) {
+      try {
+        await updateDoc(doc(db, 'hotels', hotelId), {
+          status: 'rejected',
+          rejectedBy: 'Super Admin',
+          rejectedDate: new Date().toISOString(),
+          rejectionReason: reason,
+          updatedAt: new Date()
+        });
+        
+        setHotels(prev => prev.map(hotel => 
+          hotel.id === hotelId 
+            ? { 
+                ...hotel, 
+                status: 'rejected', 
+                rejectedBy: 'Super Admin', 
+                rejectedDate: new Date().toISOString(),
+                rejectionReason: reason
+              }
+            : hotel
+        ));
+        
+        alert('Hotel rejected successfully!');
+      } catch (error) {
+        console.error('Error rejecting hotel:', error);
+        alert('Failed to reject hotel');
+      }
+    }
+  };
+
+  const handleRequestMoreInfo = (hotelId: string) => {
     const message = prompt('What additional information do you need?');
     if (message) {
       console.log(`Requesting more info for hotel ${hotelId}: ${message}`);
@@ -165,10 +185,50 @@ export default function HotelApprovals() {
             <h1 className="text-3xl font-bold text-gray-900">Hotel Approvals</h1>
             <p className="text-gray-600 mt-2">Review and approve hotel registrations</p>
           </div>
-          <Link href="/super-admin" className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap">
-            Back to Dashboard
-          </Link>
+          <div className="flex gap-3">
+            <button
+              onClick={() => fetchHotels(true)}
+              disabled={refreshing}
+              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {refreshing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <i className="ri-refresh-line w-4 h-4 flex items-center justify-center"></i>
+                  Refresh
+                </>
+              )}
+            </button>
+            <Link href="/super-admin" className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap">
+              Back to Dashboard
+            </Link>
+          </div>
         </div>
+
+        {/* Loading State */}
+        {loading && (
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center mb-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading hotels...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
+            <div className="flex">
+              <i className="ri-error-warning-line text-red-400 w-5 h-5 flex items-center justify-center mr-3 mt-0.5"></i>
+              <div>
+                <h3 className="text-sm font-medium text-red-800">Error loading hotels</h3>
+                <p className="text-sm text-red-700 mt-1">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -210,7 +270,8 @@ export default function HotelApprovals() {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-8">
+        {!loading && !error && (
+          <div className="bg-white rounded-lg shadow-sm mb-8">
           <div className="border-b border-gray-200">
             <nav className="flex">
               {[
@@ -239,52 +300,55 @@ export default function HotelApprovals() {
           <div className="p-6">
             {selectedTab === 'pending' && (
               <div className="space-y-6">
-                {pendingApprovals.map(hotel => (
-                  <div key={hotel.id} className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900">{hotel.hotelName}</h3>
-                        <p className="text-gray-600 flex items-center mt-1">
-                          <i className="ri-map-pin-line mr-2 w-4 h-4 flex items-center justify-center"></i>
-                          {hotel.location}
-                        </p>
+                {pendingApprovals.map(hotel => {
+                  const submittedDate = hotel.createdAt ? 
+                    (hotel.createdAt.toDate ? hotel.createdAt.toDate() : new Date(hotel.createdAt)) : 
+                    new Date();
+                  
+                  return (
+                    <div key={hotel.id} className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-xl font-semibold text-gray-900">{hotel.name}</h3>
+                          <p className="text-gray-600 flex items-center mt-1">
+                            <i className="ri-map-pin-line mr-2 w-4 h-4 flex items-center justify-center"></i>
+                            {hotel.location}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor('Pending Review')}`}>
+                            Pending Review
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(hotel.priority)}`}>
-                          {hotel.priority} Priority
-                        </span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(hotel.status)}`}>
-                          {hotel.status}
-                        </span>
-                      </div>
-                    </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div>
                         <div className="mb-4">
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Owner Information</h4>
-                          <p className="text-sm text-gray-900">{hotel.owner}</p>
-                          <p className="text-sm text-gray-600">{hotel.ownerEmail}</p>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Contact Information</h4>
+                          <p className="text-sm text-gray-900">{hotel.email}</p>
+                          <p className="text-sm text-gray-600">{hotel.phone}</p>
+                          <p className="text-sm text-gray-600">{hotel.address}</p>
                         </div>
 
                         <div className="mb-4">
                           <h4 className="text-sm font-medium text-gray-700 mb-2">Hotel Details</h4>
                           <div className="grid grid-cols-3 gap-4">
                             <div>
-                              <p className="text-sm text-gray-500">Rooms</p>
-                              <p className="text-sm font-medium text-gray-900">{hotel.rooms}</p>
-                            </div>
-                            <div>
                               <p className="text-sm text-gray-500">Stars</p>
                               <div className="flex items-center">
-                                {[...Array(hotel.stars)].map((_, i) => (
+                                {[...Array(parseInt(hotel.stars))].map((_, i) => (
                                   <i key={i} className="ri-star-fill text-yellow-400 text-sm w-4 h-4 flex items-center justify-center"></i>
                                 ))}
                               </div>
                             </div>
                             <div>
+                              <p className="text-sm text-gray-500">Status</p>
+                              <p className="text-sm font-medium text-gray-900 capitalize">{hotel.status}</p>
+                            </div>
+                            <div>
                               <p className="text-sm text-gray-500">Submitted</p>
-                              <p className="text-sm font-medium text-gray-900">{formatDate(hotel.submittedDate)}</p>
+                              <p className="text-sm font-medium text-gray-900">{formatDate(submittedDate.toISOString())}</p>
                             </div>
                           </div>
                         </div>
@@ -297,7 +361,7 @@ export default function HotelApprovals() {
                         <div>
                           <h4 className="text-sm font-medium text-gray-700 mb-2">Amenities</h4>
                           <div className="flex flex-wrap gap-2">
-                            {hotel.amenities.map(amenity => (
+                            {hotel.amenities?.map(amenity => (
                               <span key={amenity} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
                                 {amenity}
                               </span>
@@ -309,11 +373,11 @@ export default function HotelApprovals() {
                       <div>
                         <h4 className="text-sm font-medium text-gray-700 mb-2">Hotel Images</h4>
                         <div className="grid grid-cols-1 gap-4">
-                          {hotel.images.map((image, index) => (
+                          {hotel.images?.map((image, index) => (
                             <img
                               key={index}
                               src={image}
-                              alt={`${hotel.hotelName} ${index + 1}`}
+                              alt={`${hotel.name} ${index + 1}`}
                               className="w-full h-32 object-cover object-top rounded-lg"
                             />
                           ))}
@@ -342,7 +406,8 @@ export default function HotelApprovals() {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -352,16 +417,16 @@ export default function HotelApprovals() {
                   <div key={hotel.id} className="bg-green-50 rounded-lg p-6 border border-green-200">
                     <div className="flex justify-between items-center">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{hotel.hotelName}</h3>
+                        <h3 className="text-lg font-semibold text-gray-900">{hotel.name}</h3>
                         <p className="text-gray-600">{hotel.location}</p>
-                        <p className="text-sm text-gray-500">Owner: {hotel.owner}</p>
+                        <p className="text-sm text-gray-500">Contact: {hotel.email}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-gray-500">Approved: {formatDate(hotel.approvedDate)}</p>
-                        <p className="text-sm text-gray-500">By: {hotel.approvedBy}</p>
+                        <p className="text-sm text-gray-500">Approved: {hotel.approvedDate ? formatDate(hotel.approvedDate) : 'N/A'}</p>
+                        <p className="text-sm text-gray-500">By: {hotel.approvedBy || 'Super Admin'}</p>
                         <div className="mt-2">
-                          <p className="text-sm text-gray-500">Revenue: ${hotel.revenue.toLocaleString()}</p>
-                          <p className="text-sm text-green-600 font-medium">Commission: ${hotel.commission.toLocaleString()}</p>
+                          <p className="text-sm text-gray-500">Stars: {hotel.stars}</p>
+                          <p className="text-sm text-green-600 font-medium">Status: {hotel.status}</p>
                         </div>
                       </div>
                     </div>
@@ -376,18 +441,18 @@ export default function HotelApprovals() {
                   <div key={hotel.id} className="bg-red-50 rounded-lg p-6 border border-red-200">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{hotel.hotelName}</h3>
+                        <h3 className="text-lg font-semibold text-gray-900">{hotel.name}</h3>
                         <p className="text-gray-600">{hotel.location}</p>
-                        <p className="text-sm text-gray-500">Owner: {hotel.owner}</p>
+                        <p className="text-sm text-gray-500">Contact: {hotel.email}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-gray-500">Rejected: {formatDate(hotel.rejectedDate)}</p>
-                        <p className="text-sm text-gray-500">By: {hotel.rejectedBy}</p>
+                        <p className="text-sm text-gray-500">Rejected: {hotel.rejectedDate ? formatDate(hotel.rejectedDate) : 'N/A'}</p>
+                        <p className="text-sm text-gray-500">By: {hotel.rejectedBy || 'Super Admin'}</p>
                       </div>
                     </div>
                     <div className="mt-4 pt-4 border-t border-red-200">
                       <p className="text-sm text-gray-700">
-                        <strong>Reason:</strong> {hotel.reason}
+                        <strong>Reason:</strong> {hotel.rejectionReason || 'No reason provided'}
                       </p>
                     </div>
                   </div>
@@ -396,6 +461,7 @@ export default function HotelApprovals() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       <Footer />

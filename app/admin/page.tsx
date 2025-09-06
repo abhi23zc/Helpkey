@@ -46,39 +46,51 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!user || userData?.role !== 'admin') return;
-      
+
       setLoading(true);
       setError(null);
-      
+
       try {
-        // Fetch hotels count
-        const hotelsSnapshot = await getDocs(collection(db, 'hotels'));
+        // Filter by hotelAdmin (user.uid)
+        const hotelAdminId = user.uid;
+
+        // Fetch hotels count for this hotelAdmin
+        const hotelsQuery = query(
+          collection(db, 'hotels'),
+          where('hotelAdmin', '==', hotelAdminId)
+        );
+        const hotelsSnapshot = await getDocs(hotelsQuery);
         const totalHotels = hotelsSnapshot.size;
 
-        // Fetch rooms count
-        const roomsSnapshot = await getDocs(collection(db, 'rooms'));
+        // Fetch rooms count for this hotelAdmin
+        const roomsQuery = query(
+          collection(db, 'rooms'),
+          where('hotelAdmin', '==', hotelAdminId)
+        );
+        const roomsSnapshot = await getDocs(roomsQuery);
         const totalRooms = roomsSnapshot.size;
 
-        // Fetch all bookings
-        const bookingsSnapshot = await getDocs(collection(db, 'bookings'));
+        // Fetch bookings for this hotelAdmin
+        const bookingsQuery = query(
+          collection(db, 'bookings'),
+          where('hotelAdmin', '==', hotelAdminId)
+        );
+        const bookingsSnapshot = await getDocs(bookingsQuery);
         const totalBookings = bookingsSnapshot.size;
 
         // Calculate active bookings and revenue
         let activeBookings = 0;
         let totalRevenue = 0;
         const today = new Date();
-        
+
         bookingsSnapshot.forEach(doc => {
           const data = doc.data();
           const status = (data.status || '').toLowerCase();
           const checkIn = new Date(data.checkIn);
-          const checkOut = new Date(data.checkOut);
-          
           // Active booking: confirmed status and check-in date is in the future
           if (status === 'confirmed' && checkIn > today) {
             activeBookings++;
           }
-          
           // Add to revenue if booking is confirmed or completed
           if (status === 'confirmed' || status === 'completed') {
             totalRevenue += data.totalAmount || 0;
@@ -97,13 +109,13 @@ export default function AdminDashboard() {
           occupancyRate
         });
 
-        // Fetch recent bookings
+        // Fetch recent bookings for this hotelAdmin
         const recentBookingsQuery = query(
           collection(db, 'bookings'),
+          where('hotelAdmin', '==', hotelAdminId),
           orderBy('createdAt', 'desc'),
           limit(5)
         );
-        
         const recentBookingsSnapshot = await getDocs(recentBookingsQuery);
         const recentBookingsData: RecentBooking[] = recentBookingsSnapshot.docs.map(doc => {
           const data = doc.data();

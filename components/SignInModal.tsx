@@ -17,8 +17,8 @@ interface SignInModalProps {
 }
 
 export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
-  const [activeTab, setActiveTab] = useState('signin');
-  const [loginMethod, setLoginMethod] = useState('email'); // 'email' or 'phone'
+  const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
+  const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -56,7 +56,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     }));
   };
 
-  // Function to store user data in Firestore
+  // Store user in Firestore
   const storeUserInFirestore = async (user: any, userData: any) => {
     try {
       const userRef = doc(db, 'users', user.uid);
@@ -72,7 +72,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
         updatedAt: serverTimestamp()
       });
     } catch (error) {
-      console.error('Error storing user data:', error);
+      // Optionally handle error
     }
   };
 
@@ -90,12 +90,11 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     try {
       await signInWithEmailAndPassword(auth, signInData.email, signInData.password);
       setShowSuccess(true);
-      
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
         window.location.reload();
-      }, 2000);
+      }, 1500);
     } catch (error: any) {
       setError(error.message || 'Failed to sign in');
       setIsSubmitting(false);
@@ -134,31 +133,24 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     }
 
     try {
-      // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
-        auth, 
-        signUpData.email, 
+        auth,
+        signUpData.email,
         signUpData.password
       );
-      
-      // Update profile with name
       await updateProfile(userCredential.user, {
         displayName: `${signUpData.firstName} ${signUpData.lastName}`
       });
-      
-      // Store user data in Firestore
       await storeUserInFirestore(userCredential.user, {
         fullName: `${signUpData.firstName} ${signUpData.lastName}`,
         phone: signUpData.phone
       });
-      
       setShowSuccess(true);
-      
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
         window.location.reload();
-      }, 2000);
+      }, 1500);
     } catch (error: any) {
       setError(error.message || 'Failed to create account');
       setIsSubmitting(false);
@@ -168,28 +160,21 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
   const handleGoogleSignIn = async () => {
     setIsSubmitting(true);
     setError('');
-    
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      
-      // Check if this is a new user (sign up)
-      // @ts-ignore - credential exists on result
+      // @ts-ignore
       const isNewUser = result._tokenResponse?.isNewUser;
-      
       if (isNewUser) {
-        // Store user data in Firestore for new Google sign-ups
         await storeUserInFirestore(result.user, {
           fullName: result.user.displayName
         });
       }
-      
       setShowSuccess(true);
-      
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
         window.location.reload();
-      }, 2000);
+      }, 1500);
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google');
       setIsSubmitting(false);
@@ -198,72 +183,79 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
   if (!isOpen) return null;
 
+  // Success Modal
   if (showSuccess) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <i className="ri-check-line text-2xl text-green-600 w-8 h-8 flex items-center justify-center"></i>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              {activeTab === 'signin' ? 'Welcome Back!' : 'Account Created!'}
-            </h2>
-            <p className="text-gray-600 mb-4">
-              {activeTab === 'signin' 
-                ? 'You have successfully signed in to your account.' 
-                : 'Your account has been created successfully.'}
-            </p>
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm mx-4 flex flex-col items-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
           </div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+            {activeTab === 'signin' ? 'Welcome Back!' : 'Account Created!'}
+          </h2>
+          <p className="text-gray-600 mb-4 text-center">
+            {activeTab === 'signin'
+              ? 'You have successfully signed in to your account.'
+              : 'Your account has been created successfully.'}
+          </p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-hidden">
-      <div className="bg-white rounded-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto border border-gray-100">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-2xl font-bold text-gray-900">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+          <h2 className="text-xl font-semibold text-gray-900">
             {activeTab === 'signin' ? 'Sign In' : 'Create Account'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            className="text-gray-400 hover:text-gray-600 transition-colors rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            aria-label="Close"
+            type="button"
           >
-            <i className="ri-close-line text-xl w-6 h-6 flex items-center justify-center"></i>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mx-6 mt-4 p-3 bg-red-100 text-red-700 rounded-lg">
+          <div className="mx-6 mt-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200 text-sm">
             {error}
           </div>
         )}
 
         {/* Tabs */}
         <div className="px-6 pt-6">
-          <div className="flex border-b">
+          <div className="flex gap-2 bg-gray-50 rounded-lg p-1">
             <button
               onClick={() => setActiveTab('signin')}
-              className={`flex-1 py-2 px-4 text-center font-medium transition-colors cursor-pointer ${
+              className={`flex-1 py-2 text-center font-medium rounded-lg transition-colors ${
                 activeTab === 'signin'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-white text-blue-600 shadow'
+                  : 'text-gray-500 hover:text-blue-600'
               }`}
+              type="button"
             >
               Sign In
             </button>
             <button
               onClick={() => setActiveTab('signup')}
-              className={`flex-1 py-2 px-4 text-center font-medium transition-colors cursor-pointer ${
+              className={`flex-1 py-2 text-center font-medium rounded-lg transition-colors ${
                 activeTab === 'signup'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-white text-blue-600 shadow'
+                  : 'text-gray-500 hover:text-blue-600'
               }`}
+              type="button"
             >
               Sign Up
             </button>
@@ -273,39 +265,37 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
         {/* Content */}
         <div className="p-6">
           {activeTab === 'signin' && (
-            <form onSubmit={handleSignIn} className="space-y-4">
+            <form onSubmit={handleSignIn} className="space-y-5">
               {/* Login Method Toggle */}
-              <div className="flex bg-gray-100 rounded-lg p-1 justify-center">
+              <div className="flex bg-gray-100 rounded-lg p-1 mb-2">
                 <button
                   type="button"
                   onClick={() => setLoginMethod('email')}
-                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
                     loginMethod === 'email'
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800'
+                      ? 'bg-white text-blue-600 shadow'
+                      : 'text-gray-600 hover:text-blue-700'
                   }`}
                 >
-                  <i className="ri-mail-line mr-2 w-4 h-4 flex items-center justify-center"></i>
                   Email
                 </button>
                 <button
                   type="button"
                   onClick={() => setLoginMethod('phone')}
-                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
                     loginMethod === 'phone'
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800'
+                      ? 'bg-white text-blue-600 shadow'
+                      : 'text-gray-600 hover:text-blue-700'
                   }`}
                 >
-                  <i className="ri-phone-line mr-2 w-4 h-4 flex items-center justify-center"></i>
                   Phone
                 </button>
               </div>
 
               {loginMethod === 'email' ? (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address *
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email Address <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
@@ -313,14 +303,14 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                     value={signInData.email}
                     onChange={handleSignInChange}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50"
                     placeholder="Enter your email"
                   />
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number *
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone Number <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="tel"
@@ -328,15 +318,15 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                     value={signInData.phone}
                     onChange={handleSignInChange}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50"
                     placeholder="Enter your phone number"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Password *
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="password"
@@ -344,23 +334,23 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                   value={signInData.password}
                   onChange={handleSignInChange}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50"
                   placeholder="Enter your password"
                 />
               </div>
 
               <div className="flex items-center justify-between">
-                <label className="flex items-center">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
                     type="checkbox"
                     name="rememberMe"
                     checked={signInData.rememberMe}
                     onChange={handleSignInChange}
-                    className="mr-2"
+                    className="accent-blue-600"
                   />
-                  <span className="text-sm text-gray-700">Remember me</span>
+                  Remember me
                 </label>
-                <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 cursor-pointer">
+                <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
                   Forgot password?
                 </Link>
               </div>
@@ -368,11 +358,14 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center"
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors font-medium flex items-center justify-center"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <svg className="animate-spin h-4 w-4 mr-2 text-white" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
                     Signing In...
                   </>
                 ) : (
@@ -380,13 +373,13 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 )}
               </button>
 
-              <div className="text-center">
+              <div className="text-center pt-2">
                 <p className="text-sm text-gray-600">
                   Don't have an account?{' '}
                   <button
                     type="button"
                     onClick={() => setActiveTab('signup')}
-                    className="text-blue-600 hover:text-blue-700 cursor-pointer"
+                    className="text-blue-600 hover:underline font-medium"
                   >
                     Sign up here
                   </button>
@@ -396,11 +389,11 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
           )}
 
           {activeTab === 'signup' && (
-            <form onSubmit={handleSignUp} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSignUp} className="space-y-5">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    First Name *
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    First Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -408,13 +401,13 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                     value={signUpData.firstName}
                     onChange={handleSignUpChange}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50"
                     placeholder="First name"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Last Name *
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Last Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -422,15 +415,15 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                     value={signUpData.lastName}
                     onChange={handleSignUpChange}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50"
                     placeholder="Last name"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address *
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
@@ -438,14 +431,14 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                   value={signUpData.email}
                   onChange={handleSignUpChange}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50"
                   placeholder="Enter your email"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number *
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone Number <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -453,14 +446,14 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                   value={signUpData.phone}
                   onChange={handleSignUpChange}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50"
                   placeholder="Enter your phone number"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Password *
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="password"
@@ -468,17 +461,17 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                   value={signUpData.password}
                   onChange={handleSignUpChange}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50"
                   placeholder="Create a password"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-400 mt-1">
                   Must be at least 8 characters long
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Confirm Password *
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirm Password <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="password"
@@ -486,27 +479,27 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                   value={signUpData.confirmPassword}
                   onChange={handleSignUpChange}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50"
                   placeholder="Confirm your password"
                 />
               </div>
 
-              <div className="flex items-center">
+              <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   name="agreeToTerms"
                   checked={signUpData.agreeToTerms}
                   onChange={handleSignUpChange}
                   required
-                  className="mr-2"
+                  className="accent-blue-600"
                 />
                 <label className="text-sm text-gray-700">
                   I agree to the{' '}
-                  <Link href="/terms" className="text-blue-600 hover:text-blue-700 cursor-pointer">
+                  <Link href="/terms" className="text-blue-600 hover:underline">
                     Terms & Conditions
                   </Link>{' '}
                   and{' '}
-                  <Link href="/privacy" className="text-blue-600 hover:text-blue-700 cursor-pointer">
+                  <Link href="/privacy" className="text-blue-600 hover:underline">
                     Privacy Policy
                   </Link>
                 </label>
@@ -515,11 +508,14 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center"
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors font-medium flex items-center justify-center"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <svg className="animate-spin h-4 w-4 mr-2 text-white" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
                     Creating Account...
                   </>
                 ) : (
@@ -527,13 +523,13 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 )}
               </button>
 
-              <div className="text-center">
+              <div className="text-center pt-2">
                 <p className="text-sm text-gray-600">
                   Already have an account?{' '}
                   <button
                     type="button"
                     onClick={() => setActiveTab('signin')}
-                    className="text-blue-600 hover:text-blue-700 cursor-pointer"
+                    className="text-blue-600 hover:underline font-medium"
                   >
                     Sign in here
                   </button>
@@ -545,27 +541,42 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
         {/* Social Sign In */}
         <div className="px-6 pb-6">
-          <div className="relative">
+          <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-gray-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or continue with</span>
+              <span className="px-3 bg-white text-gray-400">Or continue with</span>
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <button 
+          <div className="grid grid-cols-2 gap-3">
+            <button
               type="button"
               onClick={handleGoogleSignIn}
-              className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
+              className="w-full flex items-center justify-center gap-2 py-2 border border-gray-200 rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition-colors font-medium shadow-sm"
             >
-              <i className="ri-google-fill text-red-500 w-5 h-5 flex items-center justify-center"></i>
-              <span className="ml-2">Google</span>
+              <svg className="w-5 h-5" viewBox="0 0 48 48">
+                <g>
+                  <path fill="#4285F4" d="M24 9.5c3.54 0 6.7 1.22 9.2 3.23l6.9-6.9C35.6 2.6 30.2 0 24 0 14.8 0 6.7 5.8 2.7 14.1l8.1 6.3C12.7 13.7 17.9 9.5 24 9.5z"/>
+                  <path fill="#34A853" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.7-2.1 5-4.4 6.6l7 5.4c4.1-3.8 6.5-9.4 6.5-16.5z"/>
+                  <path fill="#FBBC05" d="M10.8 28.2c-1-2.7-1-5.7 0-8.4l-8.1-6.3C.6 17.7 0 20.8 0 24c0 3.2.6 6.3 1.7 9.2l8.1-6.3z"/>
+                  <path fill="#EA4335" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7-5.4c-2 1.4-4.6 2.2-8.2 2.2-6.1 0-11.3-4.1-13.2-9.6l-8.1 6.3C6.7 42.2 14.8 48 24 48z"/>
+                  <path fill="none" d="M0 0h48v48H0z"/>
+                </g>
+              </svg>
+              <span>Google</span>
             </button>
-            <button className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap">
-              <i className="ri-facebook-fill text-blue-600 w-5 h-5 flex items-center justify-center"></i>
-              <span className="ml-2">Facebook</span>
+            <button
+              type="button"
+              disabled
+              className="w-full flex items-center justify-center gap-2 py-2 border border-gray-200 rounded-lg bg-white text-gray-400 cursor-not-allowed font-medium shadow-sm"
+              title="Facebook sign in coming soon"
+            >
+              <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M22.675 0h-21.35C.595 0 0 .592 0 1.326v21.348C0 23.408.595 24 1.325 24h11.495v-9.294H9.692v-3.622h3.128V8.413c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.797.143v3.24l-1.918.001c-1.504 0-1.797.715-1.797 1.763v2.313h3.587l-.467 3.622h-3.12V24h6.116C23.406 24 24 23.408 24 22.674V1.326C24 .592 23.406 0 22.675 0"/>
+              </svg>
+              <span>Facebook</span>
             </button>
           </div>
         </div>

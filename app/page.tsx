@@ -92,55 +92,58 @@ export default function Home() {
               Popular Destinations
             </h2>
             <p className="text-xl text-gray-600">
-              Explore the world's most amazing places
+              Discover India's most incredible places
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-shadow">
               <img 
-                src="https://readdy.ai/api/search-image?query=Paris%20France%20with%20iconic%20Eiffel%20Tower%2C%20charming%20cobblestone%20streets%2C%20classic%20French%20architecture%2C%20sidewalk%20cafes%2C%20romantic%20atmosphere%2C%20golden%20hour%20lighting%2C%20beautiful%20cityscape%20with%20historic%20buildings%20and%20modern%20elegance&width=400&height=300&seq=paris-dest&orientation=landscape"
-                alt="Paris"
+                src="https://s7ap1.scene7.com/is/image/incredibleindia/taj-mahal-agra-uttar-pradesh-city-1-hero?qlt=82&ts=1726650403456"
+                alt="Agra"
                 className="w-full h-48 object-cover object-top"
+                loading="lazy"
               />
               <div className="p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Paris, France</h3>
-                <p className="text-gray-600 mb-4">The City of Light awaits with its iconic landmarks and romantic charm</p>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Agra, India</h3>
+                <p className="text-gray-600 mb-4">Home to the iconic Taj Mahal, a symbol of love and architectural marvel</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-blue-600 font-semibold">From $89/night</span>
-                  <span className="text-gray-500">1,234 hotels</span>
+                  <span className="text-blue-600 font-semibold">From ₹2,999/night</span>
+                  <span className="text-gray-500">320 hotels</span>
                 </div>
               </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-shadow">
               <img 
-                src="https://readdy.ai/api/search-image?query=Tokyo%20Japan%20with%20modern%20skyscrapers%2C%20traditional%20temples%2C%20cherry%20blossoms%2C%20bustling%20streets%2C%20neon%20lights%2C%20Mt%20Fuji%20in%20distance%2C%20blend%20of%20ancient%20and%20futuristic%20architecture%2C%20vibrant%20urban%20landscape&width=400&height=300&seq=tokyo-dest&orientation=landscape"
-                alt="Tokyo"
+                src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80"
+                alt="Goa"
                 className="w-full h-48 object-cover object-top"
+                loading="lazy"
               />
               <div className="p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Tokyo, Japan</h3>
-                <p className="text-gray-600 mb-4">Experience the perfect blend of traditional culture and modern innovation</p>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Goa, India</h3>
+                <p className="text-gray-600 mb-4">Famous for its golden beaches, vibrant nightlife, and laid-back charm</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-blue-600 font-semibold">From $125/night</span>
-                  <span className="text-gray-500">987 hotels</span>
+                  <span className="text-blue-600 font-semibold">From ₹1,499/night</span>
+                  <span className="text-gray-500">540 hotels</span>
                 </div>
               </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-shadow">
               <img 
-                src="https://readdy.ai/api/search-image?query=New%20York%20City%20USA%20with%20Manhattan%20skyline%2C%20yellow%20taxis%2C%20Times%20Square%2C%20Central%20Park%2C%20Brooklyn%20Bridge%2C%20bustling%20streets%2C%20iconic%20skyscrapers%2C%20urban%20energy%2C%20classic%20American%20metropolis%20atmosphere&width=400&height=300&seq=nyc-dest&orientation=landscape"
-                alt="New York"
+                src="https://www.agoda.com/wp-content/uploads/2024/05/Nahargarh-Fort-jaipur-india-1244x700.jpg"
+                alt="Jaipur"
                 className="w-full h-48 object-cover object-top"
+                loading="lazy"
               />
               <div className="p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">New York, USA</h3>
-                <p className="text-gray-600 mb-4">The city that never sleeps offers endless possibilities and excitement</p>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Jaipur, India</h3>
+                <p className="text-gray-600 mb-4">The Pink City welcomes you with royal palaces, forts, and vibrant culture</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-blue-600 font-semibold">From $156/night</span>
-                  <span className="text-gray-500">1,567 hotels</span>
+                  <span className="text-blue-600 font-semibold">From ₹1,799/night</span>
+                  <span className="text-gray-500">410 hotels</span>
                 </div>
               </div>
             </div>

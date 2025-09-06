@@ -12,7 +12,7 @@ interface HotelItem {
   id: string;
   name: string;
   location: string;
-  address?: string;
+  address: string;
   price: number;
   originalPrice: number;
   rating: number;
@@ -22,6 +22,59 @@ interface HotelItem {
   amenities: string[];
   approved: boolean;
   status: string;
+  description: string;
+  email: string;
+  phone: string;
+  policies: {
+    cancellation?: string;
+    checkIn?: string;
+    checkOut?: string;
+    pets?: boolean;
+    smoking?: boolean;
+  };
+}
+
+function getSafeString(val: any, fallback = 'N/A') {
+  if (typeof val === 'string' && val.trim() !== '') return val;
+  return fallback;
+}
+
+function getSafeNumber(val: any, fallback = 0) {
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (typeof val === 'string' && !isNaN(Number(val))) return Number(val);
+  return fallback;
+}
+
+function getSafeArray(val: any, fallback: any[] = []) {
+  if (Array.isArray(val) && val.length > 0) return val;
+  return fallback;
+}
+
+function getSafeImage(images: any) {
+  if (Array.isArray(images) && images.length > 0 && typeof images[0] === 'string' && images[0].trim() !== '') {
+    return images[0];
+  }
+  // fallback image
+  return '/hotel-placeholder.jpg';
+}
+
+function getSafePolicies(policies: any) {
+  if (typeof policies === 'object' && policies !== null) {
+    return {
+      cancellation: getSafeString(policies.cancellation, 'See hotel policy'),
+      checkIn: getSafeString(policies.checkIn, '12:00'),
+      checkOut: getSafeString(policies.checkOut, '11:00'),
+      pets: typeof policies.pets === 'boolean' ? policies.pets : false,
+      smoking: typeof policies.smoking === 'boolean' ? policies.smoking : false,
+    };
+  }
+  return {
+    cancellation: 'See hotel policy',
+    checkIn: '12:00',
+    checkOut: '11:00',
+    pets: false,
+    smoking: false,
+  };
 }
 
 function HotelsContent() {
@@ -45,38 +98,44 @@ function HotelsContent() {
         const data = await getDocs(hotelsCollectionRef);
 
         const fetchedHotels: HotelItem[] = data.docs
-          .map(doc => ({
-            ...(doc.data() as any),
-            id: doc.id,
-            name: (doc.data() as any).name,
-            location: (doc.data() as any).location,
-            address: (doc.data() as any).address,
-            price: (doc.data() as any).price || 0,
-            originalPrice: (doc.data() as any).originalPrice || (doc.data() as any).price || 0,
-            rating: (doc.data() as any).rating || 0,
-            reviews: (doc.data() as any).reviews || 0,
-            stars: parseInt((doc.data() as any).stars) || 0,
-            image: (doc.data() as any).images && (doc.data() as any).images.length > 0 ? (doc.data() as any).images[0] : '',
-            amenities: (doc.data() as any).amenities || [],
-            approved: (doc.data() as any).approved,
-            status: (doc.data() as any).status
-          }))
+          .map(doc => {
+            const d = doc.data() as any;
+            return {
+              id: doc.id,
+              name: getSafeString(d.name, 'Unnamed Hotel'),
+              location: getSafeString(d.location, 'Unknown Location'),
+              address: getSafeString(d.address, 'No address provided'),
+              price: getSafeNumber(d.price, 0),
+              originalPrice: getSafeNumber(d.originalPrice, d.price || 0),
+              rating: getSafeNumber(d.rating, 4.2),
+              reviews: getSafeNumber(d.reviews, Math.floor(Math.random() * 100) + 1),
+              stars: getSafeNumber(d.stars, 3),
+              image: getSafeImage(d.images),
+              amenities: getSafeArray(d.amenities, ['Free WiFi']),
+              approved: d.approved === true,
+              status: getSafeString(d.status, 'inactive'),
+              description: getSafeString(d.description, 'No description available.'),
+              email: getSafeString(d.email, ''),
+              phone: getSafeString(d.phone, ''),
+              policies: getSafePolicies(d.policies),
+            };
+          })
           .filter(hotel => hotel.approved === true && hotel.status === 'active');
 
         setAllHotels(fetchedHotels);
 
+        let filteredHotels = fetchedHotels;
+
         if (searchLocation) {
           const searchLower = searchLocation.toLowerCase();
-          const filteredHotels = fetchedHotels.filter(hotel =>
+          filteredHotels = fetchedHotels.filter(hotel =>
             hotel.location?.toLowerCase().includes(searchLower) ||
             hotel.address?.toLowerCase().includes(searchLower) ||
             hotel.name?.toLowerCase().includes(searchLower)
           );
-
-          setHotels(filteredHotels.length > 0 ? filteredHotels : fetchedHotels);
-        } else {
-          setHotels(fetchedHotels);
         }
+
+        setHotels(filteredHotels.length > 0 ? filteredHotels : fetchedHotels);
 
         setLoading(false);
       } catch (error) {
@@ -87,6 +146,39 @@ function HotelsContent() {
 
     fetchHotels();
   }, [searchLocation]);
+
+  // Filtering by price, stars, amenities
+  useEffect(() => {
+    let filtered = allHotels;
+
+    // Price filter
+    filtered = filtered.filter(hotel => hotel.price >= priceRange[0] && hotel.price <= priceRange[1]);
+
+    // Star filter
+    if (selectedStars.length > 0) {
+      filtered = filtered.filter(hotel => selectedStars.includes(hotel.stars));
+    }
+
+    // Amenities filter
+    if (selectedAmenities.length > 0) {
+      filtered = filtered.filter(hotel =>
+        selectedAmenities.every(a => hotel.amenities.includes(a))
+      );
+    }
+
+    // Sorting
+    if (sortBy === 'price-low') {
+      filtered = [...filtered].sort((a, b) => a.price - b.price);
+    } else if (sortBy === 'price-high') {
+      filtered = [...filtered].sort((a, b) => b.price - a.price);
+    } else if (sortBy === 'rating') {
+      filtered = [...filtered].sort((a, b) => b.rating - a.rating);
+    }
+    // else recommended: keep as is
+
+    setHotels(filtered);
+  }, [priceRange, selectedStars, selectedAmenities, sortBy, allHotels]);
+
   const handleStarFilter = (stars: number) => {
     setSelectedStars(prev =>
       prev.includes(stars)
@@ -116,7 +208,7 @@ function HotelsContent() {
                 {searchLocation ? `Hotels in ${searchLocation}` : 'All Hotels'}
               </h1>
               <p className="text-gray-600">
-                {searchLocation ? `Searching for \"${searchLocation}\"` : 'Showing all available hotels'}
+                {searchLocation ? `Searching for "${searchLocation}"` : 'Showing all available hotels'}
               </p>
             </div>
             <button
@@ -177,7 +269,7 @@ function HotelsContent() {
               {/* Amenities */}
               <div className="mb-6">
                 <h4 className="font-medium text-gray-700 mb-3">Amenities</h4>
-                {["Free WiFi", "Pool", "Spa", "Restaurant", "Beach Access", "Parking", "Gym"].map(amenity => (
+                {["Free WiFi", "Pool", "Spa", "Restaurant", "Beach Access", "Parking", "Gym", "Room Service", "Airport Shuttle"].map(amenity => (
                   <label key={amenity} className="flex items-center cursor-pointer">
                     <input
                       type="checkbox"
@@ -233,6 +325,7 @@ function HotelsContent() {
                         src={hotel.image}
                         alt={hotel.name}
                         className="w-full h-48 md:h-full object-cover object-top"
+                        onError={e => { (e.target as HTMLImageElement).src = '/hotel-placeholder.jpg'; }}
                       />
                     </div>
                     <div className="md:w-2/3 p-6">
@@ -249,13 +342,17 @@ function HotelsContent() {
                             <i className="ri-map-pin-line mr-1 w-4 h-4 flex items-center justify-center"></i>
                             {hotel.location}
                           </p>
+                          <p className="text-gray-500 text-sm mb-2">{hotel.address}</p>
+
                         </div>
                         <div className="text-right">
                           <div className="flex items-center mb-1">
                             <span className="bg-blue-600 text-white px-2 py-1 rounded text-sm font-semibold">{hotel.rating}</span>
                             <span className="ml-2 text-sm text-gray-600">({hotel.reviews} reviews)</span>
                           </div>
-                          <span className="text-gray-400 line-through text-sm">${hotel.originalPrice}</span>
+                          {hotel.originalPrice > hotel.price && (
+                            <span className="text-gray-400 line-through text-sm">${hotel.originalPrice}</span>
+                          )}
                           <div className="text-2xl font-bold text-blue-600">${hotel.price}</div>
                           <span className="text-sm text-gray-600">per night</span>
                         </div>
@@ -270,6 +367,14 @@ function HotelsContent() {
                         {hotel.amenities.length > 4 && (
                           <span className="text-blue-600 text-sm">+{hotel.amenities.length - 4} more</span>
                         )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-4 mb-2">
+                        <span className="text-xs text-gray-500">Check-in: {hotel.policies.checkIn}</span>
+                        <span className="text-xs text-gray-500">Check-out: {hotel.policies.checkOut}</span>
+                        <span className="text-xs text-gray-500">Cancellation: {hotel.policies.cancellation}</span>
+                        <span className="text-xs text-gray-500">Pets: {hotel.policies.pets ? 'Allowed' : 'Not allowed'}</span>
+                        <span className="text-xs text-gray-500">Smoking: {hotel.policies.smoking ? 'Allowed' : 'Not allowed'}</span>
                       </div>
 
                       <div className="flex justify-between items-center">

@@ -12,13 +12,33 @@ interface HotelDetailProps {
   hotelId: string;
 }
 
+// Helper to get today's date in yyyy-mm-dd
+function getTodayDateString() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Helper to get date after N days in yyyy-mm-dd
+function getDateAfterNDaysString(n: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + n);
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function HotelDetail({ hotelId }: HotelDetailProps) {
   const router = useRouter();
   const [hotel, setHotel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState(null);
-  const [checkIn, setCheckIn] = useState("2024-03-15");
-  const [checkOut, setCheckOut] = useState("2024-03-20");
+  // Set checkIn to today, checkOut to today + 2 days
+  const [checkIn, setCheckIn] = useState(getTodayDateString());
+  const [checkOut, setCheckOut] = useState(getDateAfterNDaysString(2));
   const [guests, setGuests] = useState(2);
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -81,6 +101,8 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
 
   const handleRoomSelect = (room) => {
     setSelectedRoom(room);
+    // When a room is selected, return to overview tab
+    setActiveTab("overview");
   };
 
   const calculateNights = () => {
@@ -121,6 +143,18 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
     router.push(`/booking?${bookingParams.toString()}`);
   };
 
+  // Handler for "Select a Room" button in sidebar
+  const handleSelectRoomClick = () => {
+    setActiveTab("rooms");
+    // Optionally scroll to main content
+    if (typeof window !== "undefined") {
+      const mainContent = document.getElementById("hotel-main-content");
+      if (mainContent) {
+        mainContent.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -152,7 +186,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Main Content */}
-          <div className="lg:w-2/3">
+          <div className="lg:w-2/3" id="hotel-main-content">
             {/* Hotel Header */}
             <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
               <div className="flex justify-between items-start mb-4">
@@ -423,6 +457,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                     <input
                       type="date"
                       value={checkIn}
+                      min={getTodayDateString()}
                       onChange={(e) => setCheckIn(e.target.value)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -434,6 +469,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                     <input
                       type="date"
                       value={checkOut}
+                      min={checkIn}
                       onChange={(e) => setCheckOut(e.target.value)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -512,12 +548,12 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
               </div>
 
               <button
-                onClick={handleBookNow}
-                disabled={!selectedRoom}
+                onClick={selectedRoom ? handleBookNow : handleSelectRoomClick}
+                disabled={!!selectedRoom ? false : false}
                 className={`w-full py-3 rounded-lg font-medium whitespace-nowrap cursor-pointer ${
                   selectedRoom
                     ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
                 }`}
               >
                 {selectedRoom ? "Book Now" : "Select a Room"}

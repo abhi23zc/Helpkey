@@ -1,165 +1,130 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { collection, getDocs, orderBy, query, updateDoc, doc } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+
+interface BookingData {
+  id: string;
+  reference: string;
+  userId?: string;
+  userEmail?: string;
+  hotelId: string;
+  roomId: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  nights: number;
+  totalPrice: number;
+  taxesAndFees: number;
+  totalAmount: number;
+  unitPrice: number;
+  status: 'confirmed' | 'completed' | 'cancelled' | 'pending' | string;
+  createdAt?: any;
+  guestInfo?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    specialRequests?: string;
+  };
+  hotelDetails?: {
+    name?: string;
+    location?: string;
+    image?: string;
+    hotelId?: string;
+  };
+  roomDetails?: {
+    type?: string;
+    price?: number;
+    size?: string;
+    beds?: string;
+    image?: string;
+    roomId?: string;
+  };
+  paymentInfo?: {
+    cardholderName?: string;
+    lastFourDigits?: string;
+    billingAddress?: string;
+    city?: string;
+    country?: string;
+    zipCode?: string;
+  };
+}
 
 export default function BookingManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedHotel, setSelectedHotel] = useState('all');
   const [dateRange, setDateRange] = useState('all');
+  const [bookings, setBookings] = useState<BookingData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const bookings = [
-    {
-      id: 1,
-      bookingRef: "BK001234",
-      hotelName: "Grand Luxury Resort",
-      roomType: "Ocean View Suite",
-      guestName: "John Smith",
-      guestEmail: "john.smith@email.com",
-      guestPhone: "+1 (555) 123-4567",
-      checkIn: "2024-03-15",
-      checkOut: "2024-03-20",
-      guests: 2,
-      rooms: 1,
-      status: "Confirmed",
-      amount: 1495,
-      bookedDate: "2024-02-15",
-      paymentStatus: "Paid",
-      specialRequests: "High floor room with ocean view"
-    },
-    {
-      id: 2,
-      bookingRef: "BK001235",
-      hotelName: "City Center Business Hotel",
-      roomType: "Executive Suite",
-      guestName: "Sarah Johnson",
-      guestEmail: "sarah.johnson@email.com",
-      guestPhone: "+1 (555) 987-6543",
-      checkIn: "2024-04-10",
-      checkOut: "2024-04-12",
-      guests: 1,
-      rooms: 1,
-      status: "Confirmed",
-      amount: 578,
-      bookedDate: "2024-03-01",
-      paymentStatus: "Paid",
-      specialRequests: "Early check-in requested"
-    },
-    {
-      id: 3,
-      bookingRef: "BK001236",
-      hotelName: "Boutique Garden Hotel",
-      roomType: "Garden Suite",
-      guestName: "Michael Chen",
-      guestEmail: "michael.chen@email.com",
-      guestPhone: "+1 (555) 456-7890",
-      checkIn: "2024-03-22",
-      checkOut: "2024-03-25",
-      guests: 2,
-      rooms: 1,
-      status: "Pending",
-      amount: 675,
-      bookedDate: "2024-03-10",
-      paymentStatus: "Pending",
-      specialRequests: "Anniversary celebration"
-    },
-    {
-      id: 4,
-      bookingRef: "BK001237",
-      hotelName: "Grand Luxury Resort",
-      roomType: "Beachfront Villa",
-      guestName: "Emily Davis",
-      guestEmail: "emily.davis@email.com",
-      guestPhone: "+1 (555) 321-9876",
-      checkIn: "2024-04-05",
-      checkOut: "2024-04-08",
-      guests: 4,
-      rooms: 1,
-      status: "Cancelled",
-      amount: 1797,
-      bookedDate: "2024-02-28",
-      paymentStatus: "Refunded",
-      specialRequests: "Ground floor room preferred"
-    },
-    {
-      id: 5,
-      bookingRef: "BK001238",
-      hotelName: "Mountain View Lodge",
-      roomType: "Mountain View Room",
-      guestName: "David Wilson",
-      guestEmail: "david.wilson@email.com",
-      guestPhone: "+1 (555) 789-0123",
-      checkIn: "2024-01-15",
-      checkOut: "2024-01-18",
-      guests: 2,
-      rooms: 1,
-      status: "Completed",
-      amount: 447,
-      bookedDate: "2023-12-20",
-      paymentStatus: "Paid",
-      specialRequests: "Ski equipment storage"
-    },
-    {
-      id: 6,
-      bookingRef: "BK001239",
-      hotelName: "Seaside Resort & Spa",
-      roomType: "Spa Suite",
-      guestName: "Lisa Anderson",
-      guestEmail: "lisa.anderson@email.com",
-      guestPhone: "+1 (555) 654-3210",
-      checkIn: "2024-03-28",
-      checkOut: "2024-03-30",
-      guests: 2,
-      rooms: 1,
-      status: "Confirmed",
-      amount: 892,
-      bookedDate: "2024-03-05",
-      paymentStatus: "Paid",
-      specialRequests: "Spa package included"
+  // Fetch bookings from Firestore
+  const fetchBookings = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+      const q = query(
+        collection(db, 'bookings'),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const bookingsData: BookingData[] = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as BookingData));
+      setBookings(bookingsData);
+    } catch (err) {
+      console.error('Error fetching bookings:', err);
+      setError('Failed to load bookings. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-  ];
+  };
 
-  const hotels = [
-    "Grand Luxury Resort",
-    "City Center Business Hotel",
-    "Boutique Garden Hotel",
-    "Mountain View Lodge",
-    "Seaside Resort & Spa"
-  ];
+  useEffect(() => {
+    fetchBookings();
+  }, []);
+
+
+  // Get unique hotels from bookings data
+  const hotels = Array.from(new Set(bookings.map(booking => booking.hotelDetails?.name).filter(Boolean))) as string[];
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Confirmed': return 'bg-green-100 text-green-800';
-      case 'Pending': return 'bg-yellow-100 text-yellow-800';
-      case 'Cancelled': return 'bg-red-100 text-red-800';
-      case 'Completed': return 'bg-blue-100 text-blue-800';
+    switch (status.toLowerCase()) {
+      case 'confirmed': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      case 'completed': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case 'Paid': return 'bg-green-100 text-green-800';
-      case 'Pending': return 'bg-yellow-100 text-yellow-800';
-      case 'Refunded': return 'bg-blue-100 text-blue-800';
-      case 'Failed': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   const filteredBookings = bookings.filter(booking => {
-    const matchesSearch = booking.bookingRef.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         booking.guestName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         booking.hotelName.toLowerCase().includes(searchTerm.toLowerCase());
+    const guestName = `${booking.guestInfo?.firstName || ''} ${booking.guestInfo?.lastName || ''}`.trim();
+    const matchesSearch = booking.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         guestName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         booking.hotelDetails?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         booking.guestInfo?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    
     const matchesStatus = selectedStatus === 'all' || booking.status.toLowerCase() === selectedStatus.toLowerCase();
-    const matchesHotel = selectedHotel === 'all' || booking.hotelName === selectedHotel;
+    const matchesHotel = selectedHotel === 'all' || booking.hotelDetails?.name === selectedHotel;
     
     let matchesDate = true;
-    if (dateRange !== 'all') {
-      const bookingDate = new Date(booking.bookedDate);
+    if (dateRange !== 'all' && booking.createdAt) {
+      const bookingDate = booking.createdAt.toDate ? booking.createdAt.toDate() : new Date(booking.createdAt);
       const now = new Date();
       const daysDiff = Math.floor((now.getTime() - bookingDate.getTime()) / (1000 * 60 * 60 * 24));
       
@@ -194,9 +159,17 @@ export default function BookingManagement() {
     return Math.ceil(timeDiff / (1000 * 3600 * 24));
   };
 
-  const handleStatusChange = (bookingId: number, newStatus: string) => {
-    console.log(`Changing booking ${bookingId} status to ${newStatus}`);
-    alert(`Booking status changed to ${newStatus}`);
+  const handleStatusChange = async (bookingId: string, newStatus: string) => {
+    try {
+      await updateDoc(doc(db, 'bookings', bookingId), { status: newStatus });
+      setBookings(prev => prev.map(booking => 
+        booking.id === bookingId ? { ...booking, status: newStatus } : booking
+      ));
+      alert(`Booking status changed to ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`);
+    } catch (error) {
+      console.error('Error updating booking status:', error);
+      alert('Failed to update booking status');
+    }
   };
 
   return (
@@ -210,9 +183,28 @@ export default function BookingManagement() {
             <h1 className="text-3xl font-bold text-gray-900">Booking Management</h1>
             <p className="text-gray-600 mt-2">Manage all hotel bookings</p>
           </div>
-          <Link href="/admin" className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap">
-            Back to Dashboard
-          </Link>
+          <div className="flex gap-3">
+            <button
+              onClick={() => fetchBookings(true)}
+              disabled={refreshing}
+              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {refreshing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <i className="ri-refresh-line w-4 h-4 flex items-center justify-center"></i>
+                  Refresh
+                </>
+              )}
+            </button>
+            <Link href="/admin" className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap">
+              Back to Dashboard
+            </Link>
+          </div>
         </div>
 
         {/* Summary Stats */}
@@ -225,7 +217,7 @@ export default function BookingManagement() {
               <div className="ml-3">
                 <p className="text-sm text-gray-600">Confirmed</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {bookings.filter(b => b.status === 'Confirmed').length}
+                  {bookings.filter(b => b.status.toLowerCase() === 'confirmed').length}
                 </p>
               </div>
             </div>
@@ -239,7 +231,7 @@ export default function BookingManagement() {
               <div className="ml-3">
                 <p className="text-sm text-gray-600">Pending</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {bookings.filter(b => b.status === 'Pending').length}
+                  {bookings.filter(b => b.status.toLowerCase() === 'pending').length}
                 </p>
               </div>
             </div>
@@ -253,7 +245,7 @@ export default function BookingManagement() {
               <div className="ml-3">
                 <p className="text-sm text-gray-600">Completed</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {bookings.filter(b => b.status === 'Completed').length}
+                  {bookings.filter(b => b.status.toLowerCase() === 'completed').length}
                 </p>
               </div>
             </div>
@@ -267,12 +259,33 @@ export default function BookingManagement() {
               <div className="ml-3">
                 <p className="text-sm text-gray-600">Revenue</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  ${bookings.reduce((sum, b) => sum + (b.paymentStatus === 'Paid' ? b.amount : 0), 0).toLocaleString()}
+                  ${bookings.reduce((sum, b) => sum + (b.status.toLowerCase() === 'confirmed' || b.status.toLowerCase() === 'completed' ? b.totalAmount : 0), 0).toLocaleString()}
                 </p>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Loading State */}
+        {loading && (
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center mb-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading bookings...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
+            <div className="flex">
+              <i className="ri-error-warning-line text-red-400 w-5 h-5 flex items-center justify-center mr-3 mt-0.5"></i>
+              <div>
+                <h3 className="text-sm font-medium text-red-800">Error loading bookings</h3>
+                <p className="text-sm text-red-700 mt-1">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
@@ -337,101 +350,106 @@ export default function BookingManagement() {
         </div>
 
         {/* Bookings Table */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Booking Details
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Guest Info
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stay Details
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredBookings.map(booking => (
-                  <tr key={booking.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{booking.bookingRef}</div>
-                        <div className="text-sm text-gray-500">{booking.hotelName}</div>
-                        <div className="text-sm text-gray-500">{booking.roomType}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{booking.guestName}</div>
-                        <div className="text-sm text-gray-500">{booking.guestEmail}</div>
-                        <div className="text-sm text-gray-500">{booking.guestPhone}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm text-gray-900">
-                          {formatDate(booking.checkIn)} - {formatDate(booking.checkOut)}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {calculateNights(booking.checkIn, booking.checkOut)} nights • {booking.guests} guests
-                        </div>
-                        <div className="text-sm text-gray-500">Booked: {formatDate(booking.bookedDate)}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="space-y-1">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(booking.status)}`}>
-                          {booking.status}
-                        </span>
-                        <br />
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPaymentStatusColor(booking.paymentStatus)}`}>
-                          {booking.paymentStatus}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      ${booking.amount.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <Link href={`/admin/bookings/${booking.id}`} className="text-blue-600 hover:text-blue-900 cursor-pointer">
-                        View
-                      </Link>
-                      <span className="text-gray-300">|</span>
-                      <button
-                        onClick={() => handleStatusChange(booking.id, 'Confirmed')}
-                        className="text-green-600 hover:text-green-900 cursor-pointer"
-                      >
-                        Confirm
-                      </button>
-                      <span className="text-gray-300">|</span>
-                      <button
-                        onClick={() => handleStatusChange(booking.id, 'Cancelled')}
-                        className="text-red-600 hover:text-red-900 cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                    </td>
+        {!loading && !error && (
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Booking Details
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Guest Info
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Stay Details
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredBookings.map(booking => {
+                    const guestName = `${booking.guestInfo?.firstName || ''} ${booking.guestInfo?.lastName || ''}`.trim();
+                    const bookedDate = booking.createdAt ? 
+                      (booking.createdAt.toDate ? booking.createdAt.toDate() : new Date(booking.createdAt)) : 
+                      new Date();
+                    
+                    return (
+                      <tr key={booking.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{booking.reference}</div>
+                            <div className="text-sm text-gray-500">{booking.hotelDetails?.name || 'Hotel'}</div>
+                            <div className="text-sm text-gray-500">{booking.roomDetails?.type || 'Room'}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{guestName || 'Guest'}</div>
+                            <div className="text-sm text-gray-500">{booking.guestInfo?.email || ''}</div>
+                            <div className="text-sm text-gray-500">{booking.guestInfo?.phone || ''}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm text-gray-900">
+                              {formatDate(booking.checkIn)} - {formatDate(booking.checkOut)}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {booking.nights || calculateNights(booking.checkIn, booking.checkOut)} nights • {booking.guests} guests
+                            </div>
+                            <div className="text-sm text-gray-500">Booked: {formatDate(bookedDate.toISOString())}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="space-y-1">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(booking.status)}`}>
+                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          ${booking.totalAmount?.toLocaleString() || '0'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                          <Link href={`/admin/bookings/${booking.id}`} className="text-blue-600 hover:text-blue-900 cursor-pointer">
+                            View
+                          </Link>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => handleStatusChange(booking.id, 'confirmed')}
+                            className="text-green-600 hover:text-green-900 cursor-pointer"
+                          >
+                            Confirm
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => handleStatusChange(booking.id, 'cancelled')}
+                            className="text-red-600 hover:text-red-900 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Empty State */}
-        {filteredBookings.length === 0 && (
+        {!loading && !error && filteredBookings.length === 0 && (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <i className="ri-calendar-check-line text-4xl text-gray-400 mb-4 w-16 h-16 flex items-center justify-center mx-auto"></i>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Bookings Found</h3>
