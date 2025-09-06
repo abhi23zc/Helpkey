@@ -37,6 +37,7 @@ interface HotelDoc {
   name: string;
   location: string;
   images?: string[];
+  hotelAdmin?: string;
 }
 
 interface RoomDoc {
@@ -252,6 +253,7 @@ function BookingContent() {
         roomId: bookingData.roomId,
         userId: user?.uid || null,
         userEmail: guestInfo.email,
+        hotelAdmin: hotel?.hotelAdmin || null, // Include hotel admin ID
         checkIn: bookingData.checkIn,
         checkOut: bookingData.checkOut,
         guests: bookingData.guests,
@@ -281,14 +283,16 @@ function BookingContent() {
         hotelDetails: {
           name: displayHotelName,
           location: displayHotelLocation,
-          image: displayHotelImage
+          image: displayHotelImage,
+          hotelId: bookingData.hotelId
         },
         roomDetails: {
           type: displayRoomType,
           price: displayRoomPrice,
           size: displayRoomSize,
           beds: displayRoomBeds,
-          image: displayRoomImage
+          image: displayRoomImage,
+          roomId: bookingData.roomId
         }
       };
   

@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { collection, getDocs, orderBy, query, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, updateDoc, doc, where } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { useAuth } from '@/context/AuthContext';
 
 interface BookingData {
   id: string;
@@ -14,6 +15,7 @@ interface BookingData {
   userEmail?: string;
   hotelId: string;
   roomId: string;
+  hotelAdmin?: string;
   checkIn: string;
   checkOut: string;
   guests: number;
@@ -56,6 +58,7 @@ interface BookingData {
 }
 
 export default function BookingManagement() {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedHotel, setSelectedHotel] = useState('all');
@@ -74,8 +77,17 @@ export default function BookingManagement() {
         setLoading(true);
       }
       setError(null);
+      
+      if (!user?.uid) {
+        setError('User not authenticated');
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       const q = query(
         collection(db, 'bookings'),
+        where('hotelAdmin', '==', user.uid),
         orderBy('createdAt', 'desc')
       );
       const querySnapshot = await getDocs(q);
@@ -94,8 +106,10 @@ export default function BookingManagement() {
   };
 
   useEffect(() => {
-    fetchBookings();
-  }, []);
+    if (user?.uid) {
+      fetchBookings();
+    }
+  }, [user?.uid]);
 
 
   // Get unique hotels from bookings data
