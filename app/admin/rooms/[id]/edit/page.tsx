@@ -5,10 +5,12 @@ import { useRouter, useParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { db } from '@/config/firebase';
-import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { uploadToCloudinary } from '@/utils/cloudinary';
+import { useAuth } from '@/context/AuthContext';
 
 export default function EditRoom() {
+  const { user } = useAuth();
   const [hotelId, setHotelId] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
   const [roomType, setRoomType] = useState('');
@@ -24,8 +26,9 @@ export default function EditRoom() {
     progress: number;
     preview: string;
   }>>([]);
-  const [hotels, setHotels] = useState([]);
+  const [hotels, setHotels] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const params = useParams();
@@ -33,18 +36,31 @@ export default function EditRoom() {
 
   useEffect(() => {
     const fetchHotels = async () => {
-      const hotelsSnapshot = await getDocs(collection(db, 'hotels'));
+      if (!user?.uid) return;
+      
+      const hotelsQuery = query(
+        collection(db, 'hotels'),
+        where('hotelAdmin', '==', user.uid)
+      );
+      const hotelsSnapshot = await getDocs(hotelsQuery);
       const hotelsData = hotelsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setHotels(hotelsData);
     };
     fetchHotels();
 
-    if (id) {
+    if (id && user?.uid) {
       const fetchRoom = async () => {
         const docRef = doc(db, 'rooms', id as string);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const roomData = docSnap.data();
+          
+          // Check if the room belongs to the current user
+          if (roomData.hotelAdmin !== user.uid) {
+            setAccessDenied(true);
+            return;
+          }
+          
           setHotelId(roomData.hotelId);
           setRoomNumber(roomData.roomNumber);
           setRoomType(roomData.roomType);
@@ -59,7 +75,7 @@ export default function EditRoom() {
       };
       fetchRoom();
     }
-  }, [id]);
+  }, [id, user?.uid]);
 
   const handleFileSelect = async (files: FileList) => {
     const newFiles = Array.from(files).filter(file => 
@@ -137,11 +153,11 @@ export default function EditRoom() {
     setUploadingImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const selectedHotel = hotels.find(h => h.id === hotelId);
+      const selectedHotel = hotels.find((h: any) => h.id === hotelId);
       const roomRef = doc(db, 'rooms', id as string);
       await updateDoc(roomRef, {
         hotelId,
@@ -165,23 +181,61 @@ export default function EditRoom() {
     }
   };
 
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center py-12">
+            <div className="bg-white rounded-lg shadow-sm p-12">
+              <i className="ri-shield-cross-line text-6xl text-red-400 w-16 h-16 flex items-center justify-center mx-auto mb-4"></i>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h3>
+              <p className="text-gray-600 mb-4">You don't have permission to edit this room.</p>
+              <button 
+                onClick={() => router.push('/admin/rooms')} 
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Back to Rooms
+              </button>
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Edit Room</h1>
+            <p className="text-gray-600 mt-2">Update room information and settings</p>
+          </div>
+          <button 
+            onClick={() => router.back()} 
+            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            Back to Room
+          </button>
+        </div>
+
         <div className="bg-white rounded-lg shadow-sm p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">Edit Room</h1>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="hotel" className="block text-sm font-medium text-gray-700">Hotel</label>
+              <label htmlFor="hotel" className="block text-sm font-medium text-gray-700 mb-2">Hotel *</label>
               <select
                 id="hotel"
                 value={hotelId}
                 onChange={(e) => setHotelId(e.target.value)}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-8"
+                required
               >
                 <option value="">Select a hotel</option>
-                {hotels.map(hotel => (
+                {hotels.map((hotel: any) => (
                   <option key={hotel.id} value={hotel.id}>{hotel.name}</option>
                 ))}
               </select>
@@ -189,81 +243,86 @@ export default function EditRoom() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-700">Room Number</label>
+                <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-700 mb-2">Room Number *</label>
                 <input
                   type="text"
                   id="roomNumber"
                   value={roomNumber}
                   onChange={(e) => setRoomNumber(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  required
                 />
               </div>
               <div>
-                <label htmlFor="roomType" className="block text-sm font-medium text-gray-700">Room Type</label>
+                <label htmlFor="roomType" className="block text-sm font-medium text-gray-700 mb-2">Room Type *</label>
                 <input
                   type="text"
                   id="roomType"
                   value={roomType}
                   onChange={(e) => setRoomType(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  required
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label htmlFor="price" className="block text-sm font-medium text-gray-700">Price per Night ($)</label>
+                    <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">Price per Night (₹) *</label>
                     <input
                     type="number"
                     id="price"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    required
                     />
                 </div>
                 <div>
-                    <label htmlFor="capacity" className="block text-sm font-medium text-gray-700">Capacity</label>
+                    <label htmlFor="capacity" className="block text-sm font-medium text-gray-700 mb-2">Capacity *</label>
                     <input
                     type="number"
                     id="capacity"
                     value={capacity}
                     onChange={(e) => setCapacity(e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    required
                     />
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="size" className="block text-sm font-medium text-gray-700">Size (e.g., 1200 sq ft)</label>
+                <label htmlFor="size" className="block text-sm font-medium text-gray-700 mb-2">Size (e.g., 1200 sq ft)</label>
                 <input
                   type="text"
                   id="size"
                   value={size}
                   onChange={(e) => setSize(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
               <div>
-                <label htmlFor="beds" className="block text-sm font-medium text-gray-700">Beds (e.g., 2 Queen Beds)</label>
+                <label htmlFor="beds" className="block text-sm font-medium text-gray-700 mb-2">Beds (e.g., 2 Queen Beds)</label>
                 <input
                   type="text"
                   id="beds"
                   value={beds}
                   onChange={(e) => setBeds(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="amenities" className="block text-sm font-medium text-gray-700">Amenities (comma-separated)</label>
+              <label htmlFor="amenities" className="block text-sm font-medium text-gray-700 mb-2">Amenities (comma-separated)</label>
               <input
                 type="text"
                 id="amenities"
                 value={amenities}
                 onChange={(e) => setAmenities(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                placeholder="WiFi, Air Conditioning, TV, Mini Bar..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
 
@@ -274,19 +333,17 @@ export default function EditRoom() {
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md cursor-pointer hover:border-gray-400"
+                className="flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer hover:border-gray-400 transition-colors"
               >
                 <div className="space-y-1 text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <i className="ri-image-add-line text-4xl text-gray-400 w-12 h-12 flex items-center justify-center mx-auto"></i>
                   <div className="flex text-sm text-gray-600">
-                    <span className="relative bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+                    <span className="relative bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
                       <span>Upload files</span>
                     </span>
                     <p className="pl-1">or drag and drop</p>
                   </div>
-                  <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                  <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB each</p>
                 </div>
               </div>
               <input
@@ -335,12 +392,12 @@ export default function EditRoom() {
             )}
 
             <div>
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">Status</label>
               <select
                 id="status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pr-8"
               >
                 <option>Available</option>
                 <option>Occupied</option>
@@ -349,16 +406,20 @@ export default function EditRoom() {
               </select>
             </div>
 
-            <div className="flex justify-end space-x-3">
-              <button type="button" onClick={() => router.back()} className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+              <button 
+                type="button" 
+                onClick={() => router.back()} 
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
+              >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Updating...' : 'Update Room'}
+                {loading ? 'Updating Room...' : 'Update Room'}
               </button>
             </div>
           </form>

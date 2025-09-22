@@ -2,6 +2,7 @@
 
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import RefundRequest from '@/components/RefundRequest';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { db } from '@/config/firebase';
@@ -28,9 +29,29 @@ type BookingDoc = {
 	status: 'confirmed' | 'completed' | 'cancelled' | string;
 	createdAt?: any;
 	hotelDetails?: { name?: string; location?: string; image?: string };
-	roomDetails?: { type?: string; price?: number; size?: string; beds?: string; image?: string };
-	guestInfo?: { firstName?: string; lastName?: string; email?: string; phone?: string; specialRequests?: string };
-	paymentInfo?: { cardholderName?: string; lastFourDigits?: string; billingAddress?: string; city?: string; zipCode?: string; country?: string };
+	roomDetails?: { type?: string; price?: number; size?: string; beds?: string; image?: string; roomNumber?: string | null };
+	guestInfo?: Array<{ firstName?: string; lastName?: string; email?: string; phone?: string; specialRequests?: string }>;
+	paymentInfo?: { 
+		paymentId?: string;
+		orderId?: string;
+		signature?: string;
+		method?: string;
+		status?: string;
+		cardholderName?: string; 
+		lastFourDigits?: string; 
+		billingAddress?: string; 
+		city?: string; 
+		zipCode?: string; 
+		country?: string; 
+	};
+	refundInfo?: {
+		refundId?: string;
+		refundAmount?: number;
+		refundStatus?: string;
+		refundReason?: string;
+		refundedAt?: any;
+		refundedBy?: string;
+	};
 };
 
 function getStatusColor(status: string) {
@@ -80,7 +101,11 @@ export default function BookingDetail({ bookingId }: BookingDetailProps) {
 		load();
 	}, [bookingId]);
 
-	const canModify = useMemo(() => !!user && booking?.userId === user.uid && (booking?.status || '').toLowerCase() === 'confirmed', [user, booking]);
+	const canModify = useMemo(() => {
+		if (!user || !booking || booking.userId !== user.uid) return false;
+		const status = (booking.status || '').toLowerCase();
+		return status === 'confirmed';
+	}, [user, booking]);
 
 	const calculateNights = () => {
 		if (!booking) return 0;
@@ -233,8 +258,14 @@ export default function BookingDetail({ bookingId }: BookingDetailProps) {
 											</div>
 											<div className="flex justify-between">
 												<span className="text-gray-600">Total Amount:</span>
-												<span className="font-bold text-lg">${booking.totalAmount}</span>
+												<span className="font-bold text-lg">₹{booking.totalAmount}</span>
 											</div>
+											{booking.roomDetails?.roomNumber && (
+												<div className="flex justify-between">
+													<span className="text-gray-600">Room Number:</span>
+													<span className="font-medium text-green-600">{booking.roomDetails.roomNumber}</span>
+												</div>
+											)}
 										</div>
 									</div>
 									<div>
@@ -266,15 +297,30 @@ export default function BookingDetail({ bookingId }: BookingDetailProps) {
 									</div>
 									<div className="md:w-1/2">
 										<h4 className="text-lg font-semibold text-gray-900 mb-2">{booking.roomDetails?.type || 'Room'}</h4>
+										
+										{/* Room Number Display */}
+										{booking.roomDetails?.roomNumber && (
+											<div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+												<div className="flex items-center">
+													<i className="ri-door-open-line text-green-600 mr-2 w-5 h-5 flex items-center justify-center"></i>
+													<span className="text-green-800 font-semibold">Your Room: {booking.roomDetails.roomNumber}</span>
+												</div>
+											</div>
+										)}
+										
 										<div className="space-y-2 mb-4">
-											<div className="flex justify-between">
-												<span className="text-gray-600">Room Size:</span>
-												<span className="font-medium">{booking.roomDetails?.size || '-'}</span>
-											</div>
-											<div className="flex justify-between">
-												<span className="text-gray-600">Bed Type:</span>
-												<span className="font-medium">{booking.roomDetails?.beds || '-'}</span>
-											</div>
+											{booking.roomDetails?.size && (
+												<div className="flex justify-between">
+													<span className="text-gray-600">Room Size:</span>
+													<span className="font-medium">{booking.roomDetails.size}</span>
+												</div>
+											)}
+											{booking.roomDetails?.beds && (
+												<div className="flex justify-between">
+													<span className="text-gray-600">Bed Type:</span>
+													<span className="font-medium">{booking.roomDetails.beds}</span>
+												</div>
+											)}
 											<div className="flex justify-between">
 												<span className="text-gray-600">Occupancy:</span>
 												<span className="font-medium">Up to {booking.guests} guests</span>
@@ -294,27 +340,58 @@ export default function BookingDetail({ bookingId }: BookingDetailProps) {
 										<div className="space-y-2">
 											<div className="flex justify-between">
 												<span className="text-gray-600">Full Name:</span>
-												<span className="font-medium">{booking.guestInfo?.firstName} {booking.guestInfo?.lastName}</span>
+												<span className="font-medium">
+													{booking.guestInfo?.[0] ? `${booking.guestInfo[0].firstName || ''} ${booking.guestInfo[0].lastName || ''}`.trim() : 'N/A'}
+												</span>
 											</div>
 											<div className="flex justify-between">
 												<span className="text-gray-600">Email:</span>
-												<span className="font-medium">{booking.guestInfo?.email}</span>
+												<span className="font-medium">{booking.guestInfo?.[0]?.email || 'N/A'}</span>
 											</div>
 											<div className="flex justify-between">
 												<span className="text-gray-600">Phone:</span>
-												<span className="font-medium">{booking.guestInfo?.phone}</span>
+												<span className="font-medium">{booking.guestInfo?.[0]?.phone || 'N/A'}</span>
 											</div>
 											<div className="flex justify-between">
 												<span className="text-gray-600">Number of Guests:</span>
 												<span className="font-medium">{booking.guests}</span>
 											</div>
 										</div>
+										
+										{/* Show additional guests if any */}
+										{booking.guestInfo && booking.guestInfo.length > 1 && (
+											<div className="mt-6">
+												<h5 className="font-semibold text-gray-900 mb-3">Additional Guests</h5>
+												<div className="space-y-3">
+													{booking.guestInfo.slice(1).map((guest, index) => (
+														<div key={index} className="bg-gray-50 rounded-lg p-3">
+															<div className="space-y-1">
+																<div className="flex justify-between">
+																	<span className="text-gray-600 text-sm">Name:</span>
+																	<span className="font-medium text-sm">
+																		{`${guest.firstName || ''} ${guest.lastName || ''}`.trim() || 'N/A'}
+																	</span>
+																</div>
+																<div className="flex justify-between">
+																	<span className="text-gray-600 text-sm">Email:</span>
+																	<span className="font-medium text-sm">{guest.email || 'N/A'}</span>
+																</div>
+																<div className="flex justify-between">
+																	<span className="text-gray-600 text-sm">Phone:</span>
+																	<span className="font-medium text-sm">{guest.phone || 'N/A'}</span>
+																</div>
+															</div>
+														</div>
+													))}
+												</div>
+											</div>
+										)}
 									</div>
 									<div>
 										<h4 className="font-semibold text-gray-900 mb-3">Special Requests</h4>
 										<div className="bg-gray-50 rounded-lg p-4">
 											<p className="text-gray-700 text-sm">
-												{booking.guestInfo?.specialRequests || 'No special requests'}
+												{booking.guestInfo?.[0]?.specialRequests || 'No special requests'}
 											</p>
 										</div>
 									</div>
@@ -325,13 +402,13 @@ export default function BookingDetail({ bookingId }: BookingDetailProps) {
 						{activeTab === 'payment' && (
 							<div>
 								<h3 className="text-xl font-semibold mb-4">Payment Details</h3>
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
 									<div>
 										<h4 className="font-semibold text-gray-900 mb-3">Price Breakdown</h4>
 										<div className="space-y-2">
 											<div className="flex justify-between">
 												<span className="text-gray-600">Room Rate (per night):</span>
-												<span className="font-medium">${booking.roomDetails?.price}</span>
+												<span className="font-medium">₹{booking.roomDetails?.price}</span>
 											</div>
 											<div className="flex justify-between">
 												<span className="text-gray-600">Number of Nights:</span>
@@ -339,16 +416,16 @@ export default function BookingDetail({ bookingId }: BookingDetailProps) {
 											</div>
 											<div className="flex justify-between">
 												<span className="text-gray-600">Subtotal:</span>
-												<span className="font-medium">${booking.totalPrice}</span>
+												<span className="font-medium">₹{booking.totalPrice}</span>
 											</div>
 											<div className="flex justify-between">
 												<span className="text-gray-600">Taxes & Fees:</span>
-												<span className="font-medium">${booking.taxesAndFees}</span>
+												<span className="font-medium">₹{booking.taxesAndFees}</span>
 											</div>
 											<div className="border-t pt-2">
 												<div className="flex justify-between">
 													<span className="text-lg font-semibold text-gray-900">Total Paid:</span>
-													<span className="text-lg font-bold text-blue-600">${booking.totalAmount}</span>
+													<span className="text-lg font-bold text-blue-600">₹{booking.totalAmount}</span>
 												</div>
 											</div>
 										</div>
@@ -359,20 +436,95 @@ export default function BookingDetail({ bookingId }: BookingDetailProps) {
 											<div className="space-y-2 text-sm">
 												<div className="flex justify-between">
 													<span className="text-gray-600">Payment Method:</span>
-													<span className="font-medium">Credit Card</span>
+													<span className="font-medium">{booking.paymentInfo?.method || 'Razorpay'}</span>
 												</div>
+												{booking.paymentInfo?.paymentId && (
+													<div className="flex justify-between">
+														<span className="text-gray-600">Payment ID:</span>
+														<span className="font-medium text-xs">{booking.paymentInfo.paymentId}</span>
+													</div>
+												)}
+												{booking.paymentInfo?.orderId && (
+													<div className="flex justify-between">
+														<span className="text-gray-600">Order ID:</span>
+														<span className="font-medium text-xs">{booking.paymentInfo.orderId}</span>
+													</div>
+												)}
 												<div className="flex justify-between">
-													<span className="text-gray-600">Cardholder:</span>
-													<span className="font-medium">{booking.paymentInfo?.cardholderName} ****{booking.paymentInfo?.lastFourDigits}</span>
+													<span className="text-gray-600">Payment Status:</span>
+													<span className={`px-2 py-1 rounded-full text-xs font-medium ${
+														booking.paymentInfo?.status === 'completed' 
+															? 'bg-green-100 text-green-800' 
+															: 'bg-yellow-100 text-yellow-800'
+													}`}>
+														{booking.paymentInfo?.status || 'completed'}
+													</span>
 												</div>
-												<div className="flex justify-between">
-													<span className="text-gray-600">Billing:</span>
-													<span className="font-medium">{booking.paymentInfo?.billingAddress}, {booking.paymentInfo?.city}, {booking.paymentInfo?.zipCode}, {booking.paymentInfo?.country}</span>
-												</div>
+												{booking.paymentInfo?.cardholderName && (
+													<div className="flex justify-between">
+														<span className="text-gray-600">Cardholder:</span>
+														<span className="font-medium">{booking.paymentInfo.cardholderName}</span>
+													</div>
+												)}
+												{booking.paymentInfo?.lastFourDigits && (
+													<div className="flex justify-between">
+														<span className="text-gray-600">Card Number:</span>
+														<span className="font-medium">**** **** **** {booking.paymentInfo.lastFourDigits}</span>
+													</div>
+												)}
 											</div>
 										</div>
 									</div>
 								</div>
+
+								{/* Refund Information */}
+								{booking.refundInfo && (
+									<div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+										<h4 className="font-semibold text-red-900 mb-3">Refund Information</h4>
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+											<div className="space-y-2 text-sm">
+												<div className="flex justify-between">
+													<span className="text-red-700">Refund ID:</span>
+													<span className="font-medium text-xs">{booking.refundInfo.refundId}</span>
+												</div>
+												<div className="flex justify-between">
+													<span className="text-red-700">Refund Amount:</span>
+													<span className="font-bold text-red-800">₹{booking.refundInfo.refundAmount}</span>
+												</div>
+											</div>
+											<div className="space-y-2 text-sm">
+												<div className="flex justify-between">
+													<span className="text-red-700">Refund Status:</span>
+													<span className={`px-2 py-1 rounded-full text-xs font-medium ${
+														booking.refundInfo.refundStatus === 'processed' 
+															? 'bg-green-100 text-green-800' 
+															: 'bg-yellow-100 text-yellow-800'
+													}`}>
+														{booking.refundInfo.refundStatus}
+													</span>
+												</div>
+												<div className="flex justify-between">
+													<span className="text-red-700">Refund Reason:</span>
+													<span className="font-medium">{booking.refundInfo.refundReason}</span>
+												</div>
+											</div>
+										</div>
+									</div>
+								)}
+
+								{/* Refund Request - Only for cancelled bookings with payments */}
+								{booking.paymentInfo?.paymentId && booking.status.toLowerCase() === 'cancelled' && (
+									<div className="border-t pt-6">
+										<RefundRequest
+											bookingId={booking.id}
+											bookingReference={booking.reference}
+											totalAmount={booking.totalAmount}
+											onRequestSubmitted={() => {
+												alert('Refund request submitted successfully. We will process it within 2-3 business days.');
+											}}
+										/>
+									</div>
+								)}
 							</div>
 						)}
 					</div>

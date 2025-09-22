@@ -38,10 +38,16 @@ export default function HotelManagement() {
   // Fetch hotels from Firestore
   useEffect(() => {
     const fetchHotels = async () => {
+      // Don't fetch if user is not authenticated
+      if (!user?.uid) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const hotelsQuery = query(
           collection(db, 'hotels'),
-          where('hotelAdmin', '==', user?.uid)
+          where('hotelAdmin', '==', user.uid)
         );
         const querySnapshot = await getDocs(hotelsQuery);
 

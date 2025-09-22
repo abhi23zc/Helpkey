@@ -6,6 +6,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { db } from '@/config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { useAuth } from '@/context/AuthContext';
 
 interface Room {
   id: string;
@@ -25,15 +26,17 @@ interface Room {
 }
 
 export default function RoomDetails() {
+  const { user } = useAuth();
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [accessDenied, setAccessDenied] = useState(false);
   const params = useParams();
   const router = useRouter();
   const { id } = params;
 
   useEffect(() => {
-    if (id) {
+    if (id && user?.uid) {
       const fetchRoom = async () => {
         try {
           const docRef = doc(db, 'rooms', id as string);
@@ -41,6 +44,14 @@ export default function RoomDetails() {
           
           if (docSnap.exists()) {
             const data = docSnap.data();
+            
+            // Check if the room belongs to the current user
+            if (data.hotelAdmin !== user.uid) {
+              setAccessDenied(true);
+              setLoading(false);
+              return;
+            }
+            
             const processedRoom: Room = {
               id: docSnap.id,
               ...data,
@@ -63,15 +74,15 @@ export default function RoomDetails() {
       };
       fetchRoom();
     }
-  }, [id]);
+  }, [id, user?.uid]);
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'available': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'occupied': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'maintenance': return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'out of order': return 'bg-red-50 text-red-700 border-red-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
+      case 'available': return 'bg-green-100 text-green-800';
+      case 'occupied': return 'bg-blue-100 text-blue-800';
+      case 'maintenance': return 'bg-yellow-100 text-yellow-800';
+      case 'out of order': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -87,11 +98,36 @@ export default function RoomDetails() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen bg-gray-50">
         <Header />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <div className="animate-spin mx-auto h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+            <p className="mt-4 text-gray-600">Loading room details...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center py-12">
+            <div className="bg-white rounded-lg shadow-sm p-12">
+              <i className="ri-shield-cross-line text-6xl text-red-400 w-16 h-16 flex items-center justify-center mx-auto mb-4"></i>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h3>
+              <p className="text-gray-600 mb-4">You don't have permission to view this room.</p>
+              <button 
+                onClick={() => router.push('/admin/rooms')} 
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Back to Rooms
+              </button>
+            </div>
           </div>
         </div>
         <Footer />
@@ -101,17 +137,17 @@ export default function RoomDetails() {
 
   if (!room) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen bg-gray-50">
         <Header />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center py-12">
-            <div className="bg-white rounded-2xl shadow-lg p-12">
-              <div className="text-6xl mb-4">❌</div>
+            <div className="bg-white rounded-lg shadow-sm p-12">
+              <i className="ri-error-warning-line text-6xl text-gray-400 w-16 h-16 flex items-center justify-center mx-auto mb-4"></i>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Room Not Found</h3>
               <p className="text-gray-600 mb-4">The room you're looking for doesn't exist.</p>
               <button 
                 onClick={() => router.back()} 
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap"
               >
                 Go Back
               </button>
@@ -124,48 +160,46 @@ export default function RoomDetails() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       <Header />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
-          <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-gray-900">{room.roomType}</h1>
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(room.status)}`}>
-                  <span className="mr-1">{getStatusIcon(room.status)}</span>
-                  {room.status}
-                </span>
-              </div>
-              <p className="text-lg text-gray-600 flex items-center gap-2">
-                <span>🏨</span> {room.hotelName}
-                <span className="text-gray-400">•</span>
-                <span>Room {room.roomNumber}</span>
-              </p>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-bold text-gray-900">{room.roomType}</h1>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(room.status)}`}>
+                {room.status}
+              </span>
             </div>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => router.back()} 
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2"
-              >
-                <span>←</span> Back
-              </button>
-              <button 
-                onClick={() => router.push(`/admin/rooms/${room.id}/edit`)} 
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all flex items-center gap-2"
-              >
-                <span>✏️</span> Edit Room
-              </button>
-            </div>
+            <p className="text-gray-600 flex items-center gap-2">
+              <i className="ri-hotel-line w-4 h-4 flex items-center justify-center"></i>
+              {room.hotelName}
+              <span className="text-gray-400">•</span>
+              <span>Room {room.roomNumber}</span>
+            </p>
+          </div>
+          <div className="flex space-x-3">
+            <button 
+              onClick={() => router.back()} 
+              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Back to Rooms
+            </button>
+            <button 
+              onClick={() => router.push(`/admin/rooms/${room.id}/edit`)} 
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Edit Room
+            </button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Image Gallery */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               {/* Main Image */}
               <div className="relative h-96 bg-gray-100">
                 {room.images && room.images.length > 0 ? (
@@ -178,9 +212,9 @@ export default function RoomDetails() {
                     }}
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="text-6xl mb-4">🏨</div>
+                      <i className="ri-image-line text-6xl text-gray-400 w-16 h-16 flex items-center justify-center mx-auto mb-4"></i>
                       <p className="text-gray-600">No images available</p>
                     </div>
                   </div>
@@ -193,13 +227,13 @@ export default function RoomDetails() {
                       onClick={() => setSelectedImage(prev => prev > 0 ? prev - 1 : room.images.length - 1)}
                       className="bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-lg transition-all"
                     >
-                      <span className="text-gray-700">❮</span>
+                      <i className="ri-arrow-left-line text-gray-700 w-5 h-5 flex items-center justify-center"></i>
                     </button>
                     <button 
                       onClick={() => setSelectedImage(prev => prev < room.images.length - 1 ? prev + 1 : 0)}
                       className="bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-lg transition-all"
                     >
-                      <span className="text-gray-700">❯</span>
+                      <i className="ri-arrow-right-line text-gray-700 w-5 h-5 flex items-center justify-center"></i>
                     </button>
                   </div>
                 )}
@@ -214,7 +248,7 @@ export default function RoomDetails() {
                         key={index}
                         onClick={() => setSelectedImage(index)}
                         className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
-                          selectedImage === index ? 'border-blue-500 scale-105' : 'border-gray-200 hover:border-gray-300'
+                          selectedImage === index ? 'border-blue-500' : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
                         <img 
@@ -233,8 +267,8 @@ export default function RoomDetails() {
             </div>
 
             {/* Description */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">About This Room</h3>
+            <div className="bg-white rounded-lg shadow-sm p-6 mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">About This Room</h3>
               <p className="text-gray-600 leading-relaxed">{room.description}</p>
             </div>
           </div>
@@ -243,39 +277,39 @@ export default function RoomDetails() {
           <div className="lg:col-span-1">
             <div className="space-y-6">
               {/* Price Card */}
-              <div className="bg-white rounded-2xl shadow-lg p-6">
+              <div className="bg-white rounded-lg shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Pricing</h3>
                 <div className="text-center">
-                  <p className="text-4xl font-bold text-gray-900">${room.price}</p>
+                  <p className="text-4xl font-bold text-gray-900">₹{room.price}</p>
                   <p className="text-gray-600">per night</p>
                 </div>
               </div>
 
               {/* Room Specs */}
-              <div className="bg-white rounded-2xl shadow-lg p-6">
+              <div className="bg-white rounded-lg shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Room Specifications</h3>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 flex items-center gap-2">
-                      <span>📏</span> Size
+                      <i className="ri-ruler-line w-4 h-4 flex items-center justify-center"></i> Size
                     </span>
                     <span className="font-semibold">{room.size} sq ft</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 flex items-center gap-2">
-                      <span>🛏️</span> Beds
+                      <i className="ri-hotel-bed-line w-4 h-4 flex items-center justify-center"></i> Beds
                     </span>
                     <span className="font-semibold">{room.beds}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 flex items-center gap-2">
-                      <span>👥</span> Max Guests
+                      <i className="ri-user-line w-4 h-4 flex items-center justify-center"></i> Max Guests
                     </span>
                     <span className="font-semibold">{room.capacity} people</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 flex items-center gap-2">
-                      <span>🔢</span> Room Number
+                      <i className="ri-hashtag w-4 h-4 flex items-center justify-center"></i> Room Number
                     </span>
                     <span className="font-semibold">#{room.roomNumber}</span>
                   </div>
@@ -283,13 +317,13 @@ export default function RoomDetails() {
               </div>
 
               {/* Amenities */}
-              <div className="bg-white rounded-2xl shadow-lg p-6">
+              <div className="bg-white rounded-lg shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Amenities</h3>
                 {room.amenities && room.amenities.length > 0 ? (
                   <div className="space-y-2">
                     {room.amenities.map((amenity, index) => (
                       <div key={index} className="flex items-center gap-3">
-                        <span className="text-green-500">✓</span>
+                        <i className="ri-check-line text-green-500 w-4 h-4 flex items-center justify-center"></i>
                         <span className="text-gray-700">{amenity}</span>
                       </div>
                     ))}
@@ -300,14 +334,14 @@ export default function RoomDetails() {
               </div>
 
               {/* Actions */}
-              <div className="bg-white rounded-2xl shadow-lg p-6">
+              <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="space-y-3">
-                  <button className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all">
+                  <button className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
                     Book This Room
                   </button>
                   <button 
                     onClick={() => router.push(`/admin/rooms/${room.id}/edit`)}
-                    className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all"
+                    className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     Edit Room Details
                   </button>

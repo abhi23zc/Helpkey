@@ -30,7 +30,6 @@ interface RecentBooking {
 
 export default function AdminDashboard() {
   const { user, userData } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState<Stats>({
     totalHotels: 0,
     totalRooms: 0,
@@ -44,6 +43,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+   
     const fetchDashboardData = async () => {
       if (!user || userData?.role !== 'admin') return;
 
@@ -146,11 +146,11 @@ export default function AdminDashboard() {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'confirmed': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'completed': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'confirmed': return 'bg-green-50 text-green-700 border-green-200';
+      case 'pending': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'cancelled': return 'bg-red-50 text-red-700 border-red-200';
+      case 'completed': return 'bg-blue-50 text-blue-700 border-blue-200';
+      default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
@@ -158,8 +158,18 @@ export default function AdminDashboard() {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
+      year: 'numeric'
     });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
   };
 
   // Check if user is admin
@@ -167,14 +177,18 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-          <div className="bg-white rounded-lg shadow-sm p-8">
-            <i className="ri-shield-check-line text-6xl text-red-500 mb-4 w-16 h-16 flex items-center justify-center mx-auto"></i>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
-            <p className="text-gray-600 mb-6">You don't have permission to access the admin dashboard.</p>
-            <Link href="/" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
-              Return to Home
-            </Link>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-8">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <i className="ri-shield-check-line text-red-600 text-xl"></i>
+              </div>
+              <h1 className="text-2xl font-semibold text-gray-900 mb-2">Access Denied</h1>
+              <p className="text-gray-600 mb-6">You don't have permission to access the admin dashboard.</p>
+              <Link href="/" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Return to Home
+              </Link>
+            </div>
           </div>
         </div>
         <Footer />
@@ -186,9 +200,13 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading dashboard...</p>
+            </div>
+          </div>
         </div>
         <Footer />
       </div>
@@ -199,17 +217,21 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-          <div className="bg-white rounded-lg shadow-sm p-8">
-            <i className="ri-error-warning-line text-6xl text-red-500 mb-4 w-16 h-16 flex items-center justify-center mx-auto"></i>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Dashboard</h1>
-            <p className="text-gray-600 mb-6">{error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Retry
-            </button>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-8">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <i className="ri-error-warning-line text-red-600 text-xl"></i>
+              </div>
+              <h1 className="text-2xl font-semibold text-gray-900 mb-2">Error Loading Dashboard</h1>
+              <p className="text-gray-600 mb-6">{error}</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         </div>
         <Footer />
@@ -222,266 +244,235 @@ export default function AdminDashboard() {
       <Header />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
+        {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Hotel Admin Dashboard</h1>
-          <p className="text-gray-600 mt-2">Manage your hotels, rooms, and bookings</p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-6 lg:col-span-2">
-            <div className="flex items-center">
-              <div className="bg-blue-100 rounded-lg p-3">
-                <i className="ri-hotel-line text-blue-600 text-xl w-6 h-6 flex items-center justify-center"></i>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Total Hotels</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalHotels}</p>
-              </div>
+          <div className="md:flex md:items-center md:justify-between">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+                Dashboard
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Welcome back, {userData?.fullName || 'Admin'}. Here's an overview of your hotel operations.
+              </p>
             </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6 lg:col-span-2">
-            <div className="flex items-center">
-              <div className="bg-green-100 rounded-lg p-3">
-                <i className="ri-hotel-bed-line text-green-600 text-xl w-6 h-6 flex items-center justify-center"></i>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Total Rooms</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalRooms}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6 lg:col-span-2">
-            <div className="flex items-center">
-              <div className="bg-purple-100 rounded-lg p-3">
-                <i className="ri-calendar-check-line text-purple-600 text-xl w-6 h-6 flex items-center justify-center"></i>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Active Bookings</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeBookings}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6 lg:col-span-2">
-            <div className="flex items-center">
-              <div className="bg-yellow-100 rounded-lg p-3">
-                <i className="ri-line-chart-line text-yellow-600 text-xl w-6 h-6 flex items-center justify-center"></i>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Occupancy Rate</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.occupancyRate}%</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6 lg:col-span-2">
-            <div className="flex items-center">
-              <div className="bg-red-100 rounded-lg p-3">
-                <i className="ri-money-dollar-circle-line text-red-600 text-xl w-6 h-6 flex items-center justify-center"></i>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">${stats.revenue.toLocaleString()}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6 lg:col-span-2">
-            <div className="flex items-center">
-              <div className="bg-indigo-100 rounded-lg p-3">
-                <i className="ri-file-list-3-line text-indigo-600 text-xl w-6 h-6 flex items-center justify-center"></i>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Total Bookings</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalBookings}</p>
-              </div>
+            <div className="mt-4 flex md:mt-0 md:ml-4">
+              <Link
+                href="/admin/hotels/add"
+                className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <i className="ri-add-line mr-2"></i>
+                Add Hotel
+              </Link>
             </div>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="flex">
-              {[
-                { id: 'overview', label: 'Overview', icon: 'ri-dashboard-line' },
-                { id: 'hotels', label: 'Hotels', icon: 'ri-hotel-line' },
-                { id: 'rooms', label: 'Rooms', icon: 'ri-hotel-bed-line' },
-                { id: 'bookings', label: 'Bookings', icon: 'ri-calendar-check-line' }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center px-6 py-3 text-sm font-medium whitespace-nowrap cursor-pointer border-b-2 ${
-                    activeTab === tab.id
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <i className={`${tab.icon} mr-2 w-4 h-4 flex items-center justify-center`}></i>
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-
-          <div className="p-6">
-            {activeTab === 'overview' && (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold">Recent Activity</h2>
-                  <div className="flex space-x-3">
-                    <Link href="/admin/hotels" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap">
-                      Manage Hotels
-                    </Link>
-                    <Link href="/admin/bookings" className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap">
-                      View All Bookings
-                    </Link>
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+          <div className="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
+                    <i className="ri-hotel-line text-blue-600"></i>
                   </div>
                 </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Hotels</dt>
+                    <dd className="text-lg font-medium text-gray-900">{stats.totalHotels}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold mb-4">Recent Bookings</h3>
-                    {recentBookings.length > 0 ? (
-                      <div className="space-y-3">
-                        {recentBookings.map(booking => (
-                          <div key={booking.id} className="bg-white rounded-lg p-4 border border-gray-200">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <p className="font-medium text-gray-900">{booking.reference}</p>
-                                <p className="text-sm text-gray-600">{booking.hotelName}</p>
+          <div className="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
+                    <i className="ri-hotel-bed-line text-green-600"></i>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Rooms</dt>
+                    <dd className="text-lg font-medium text-gray-900">{stats.totalRooms}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
+                    <i className="ri-calendar-check-line text-purple-600"></i>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Active Bookings</dt>
+                    <dd className="text-lg font-medium text-gray-900">{stats.activeBookings}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-yellow-100 rounded-md flex items-center justify-center">
+                    <i className="ri-money-dollar-circle-line text-yellow-600"></i>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Revenue</dt>
+                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(stats.revenue)}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Recent Bookings */}
+          <div className="lg:col-span-2">
+            <div className="bg-white shadow-sm border border-gray-200 rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Recent Bookings</h3>
+                  <Link
+                    href="/admin/bookings"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-500"
+                  >
+                    View all
+                  </Link>
+                </div>
+                
+                {recentBookings.length > 0 ? (
+                  <div className="flow-root">
+                    <ul className="-my-5 divide-y divide-gray-200">
+                      {recentBookings.map((booking) => (
+                        <li key={booking.id} className="py-4">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex-shrink-0">
+                              <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
+                                <i className="ri-calendar-line text-gray-600"></i>
                               </div>
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {booking.reference}
+                              </p>
+                              <p className="text-sm text-gray-500 truncate">
+                                {booking.hotelName} • {booking.guestName}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {formatDate(booking.checkIn)} - {formatDate(booking.checkOut)}
+                              </p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(booking.status)}`}>
                                 {booking.status}
                               </span>
-                            </div>
-                            <div className="flex justify-between items-center text-sm text-gray-600">
-                              <span>{booking.guestName}</span>
-                              <span className="font-medium text-gray-900">${booking.amount}</span>
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {formatDate(booking.checkIn)} - {formatDate(booking.checkOut)}
+                              <span className="text-sm font-medium text-gray-900">
+                                {formatCurrency(booking.amount)}
+                              </span>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        <i className="ri-calendar-line text-4xl mb-2 w-12 h-12 flex items-center justify-center mx-auto"></i>
-                        <p>No recent bookings</p>
-                      </div>
-                    )}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <i className="ri-calendar-line text-4xl text-gray-400 mb-2"></i>
+                    <h3 className="text-sm font-medium text-gray-900">No recent bookings</h3>
+                    <p className="text-sm text-gray-500">Your recent bookings will appear here.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-                    <div className="space-y-3">
-                      <Link href="/admin/hotels/add" className="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-                        <div className="bg-blue-100 rounded-lg p-3 mr-4">
-                          <i className="ri-add-line text-blue-600 w-5 h-5 flex items-center justify-center"></i>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Add New Hotel</p>
-                          <p className="text-sm text-gray-600">Create a new hotel listing</p>
-                        </div>
-                      </Link>
-
-                      <Link href="/admin/rooms/add" className="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-                        <div className="bg-green-100 rounded-lg p-3 mr-4">
-                          <i className="ri-home-add-line text-green-600 w-5 h-5 flex items-center justify-center"></i>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Add New Room</p>
-                          <p className="text-sm text-gray-600">Add rooms to existing hotels</p>
-                        </div>
-                      </Link>
-
-                      <Link href="/admin/bookings" className="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-                        <div className="bg-purple-100 rounded-lg p-3 mr-4">
-                          <i className="ri-calendar-check-line text-purple-600 w-5 h-5 flex items-center justify-center"></i>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Manage Bookings</p>
-                          <p className="text-sm text-gray-600">View and manage all bookings</p>
-                        </div>
-                      </Link>
-
-                      <Link href="/admin/reports" className="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-                        <div className="bg-yellow-100 rounded-lg p-3 mr-4">
-                          <i className="ri-bar-chart-line text-yellow-600 w-5 h-5 flex items-center justify-center"></i>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">View Reports</p>
-                          <p className="text-sm text-gray-600">Analytics and performance reports</p>
-                        </div>
-                      </Link>
+          {/* Quick Actions */}
+          <div>
+            <div className="bg-white shadow-sm border border-gray-200 rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Quick Actions</h3>
+                <div className="space-y-3">
+                  <Link
+                    href="/admin/hotels"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <div className="flex items-center">
+                      <i className="ri-hotel-line text-gray-400 mr-3"></i>
+                      Manage Hotels
                     </div>
+                    <i className="ri-arrow-right-line text-gray-400"></i>
+                  </Link>
+
+                  <Link
+                    href="/admin/rooms"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <div className="flex items-center">
+                      <i className="ri-hotel-bed-line text-gray-400 mr-3"></i>
+                      Manage Rooms
+                    </div>
+                    <i className="ri-arrow-right-line text-gray-400"></i>
+                  </Link>
+
+                  <Link
+                    href="/admin/bookings"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <div className="flex items-center">
+                      <i className="ri-calendar-check-line text-gray-400 mr-3"></i>
+                      View Bookings
+                    </div>
+                    <i className="ri-arrow-right-line text-gray-400"></i>
+                  </Link>
+
+                  <Link
+                    href="/admin/rooms/add"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <div className="flex items-center">
+                      <i className="ri-add-line text-gray-400 mr-3"></i>
+                      Add Room
+                    </div>
+                    <i className="ri-arrow-right-line text-gray-400"></i>
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Stats */}
+            <div className="mt-6 bg-white shadow-sm border border-gray-200 rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Performance</h3>
+                <dl className="space-y-3">
+                  <div className="flex justify-between">
+                    <dt className="text-sm font-medium text-gray-500">Occupancy Rate</dt>
+                    <dd className="text-sm text-gray-900">{stats.occupancyRate}%</dd>
                   </div>
-                </div>
+                  <div className="flex justify-between">
+                    <dt className="text-sm font-medium text-gray-500">Total Bookings</dt>
+                    <dd className="text-sm text-gray-900">{stats.totalBookings}</dd>
+                  </div>
+                </dl>
               </div>
-            )}
-
-            {activeTab === 'hotels' && (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold">Hotel Management</h2>
-                  <Link href="/admin/hotels" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap">
-                    View All Hotels
-                  </Link>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-8 text-center">
-                  <i className="ri-hotel-line text-4xl text-gray-400 mb-4 w-16 h-16 flex items-center justify-center mx-auto"></i>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Manage Your Hotels</h3>
-                  <p className="text-gray-600 mb-4">Add, edit, or remove hotels from your portfolio</p>
-                  <Link href="/admin/hotels" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap">
-                    Go to Hotels
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'rooms' && (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold">Room Management</h2>
-                  <Link href="/admin/rooms" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap">
-                    View All Rooms
-                  </Link>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-8 text-center">
-                  <i className="ri-hotel-bed-line text-4xl text-gray-400 mb-4 w-16 h-16 flex items-center justify-center mx-auto"></i>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Manage Your Rooms</h3>
-                  <p className="text-gray-600 mb-4">Add, edit, or remove rooms from your hotels</p>
-                  <Link href="/admin/rooms" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap">
-                    Go to Rooms
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'bookings' && (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold">Booking Management</h2>
-                  <Link href="/admin/bookings" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap">
-                    View All Bookings
-                  </Link>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-8 text-center">
-                  <i className="ri-calendar-check-line text-4xl text-gray-400 mb-4 w-16 h-16 flex items-center justify-center mx-auto"></i>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Manage Your Bookings</h3>
-                  <p className="text-gray-600 mb-4">View, edit, or cancel customer bookings</p>
-                  <Link href="/admin/bookings" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap">
-                    Go to Bookings
-                  </Link>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

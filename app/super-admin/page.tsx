@@ -32,7 +32,6 @@ interface Activity {
 }
 
 export default function SuperAdminDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
     activeUsers: 0,
@@ -205,11 +204,11 @@ export default function SuperAdminDashboard() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'text-yellow-600';
-      case 'active': return 'text-green-600';
-      case 'suspended': return 'text-red-600';
-      case 'success': return 'text-blue-600';
-      default: return 'text-gray-600';
+      case 'pending': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'active': return 'bg-green-50 text-green-700 border-green-200';
+      case 'suspended': return 'bg-red-50 text-red-700 border-red-200';
+      case 'success': return 'bg-blue-50 text-blue-700 border-blue-200';
+      default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
@@ -225,13 +224,25 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading dashboard...</p>
+            </div>
           </div>
         </div>
         <Footer />
@@ -243,17 +254,21 @@ export default function SuperAdminDashboard() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center py-12">
-            <i className="ri-error-warning-line text-6xl text-red-500 mb-4"></i>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Retry
-            </button>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-8">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <i className="ri-error-warning-line text-red-600 text-xl"></i>
+              </div>
+              <h1 className="text-2xl font-semibold text-gray-900 mb-2">Error Loading Dashboard</h1>
+              <p className="text-gray-600 mb-6">{error}</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         </div>
         <Footer />
@@ -266,182 +281,268 @@ export default function SuperAdminDashboard() {
       <Header />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
+        {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Super Admin Dashboard</h1>
-          <p className="text-gray-600 mt-2">Complete system control and management</p>
-        </div>
-
-        {/* Key Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="bg-blue-100 rounded-lg p-3">
-                <i className="ri-user-line text-blue-600 text-xl w-6 h-6 flex items-center justify-center"></i>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalUsers.toLocaleString()}</p>
-                <p className="text-xs text-green-600">+{stats.monthlyGrowth.toFixed(1)}% this month</p>
-              </div>
+          <div className="md:flex md:items-center md:justify-between">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+                System Administration
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Complete platform control and management dashboard
+              </p>
             </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="bg-green-100 rounded-lg p-3">
-                <i className="ri-hotel-line text-green-600 text-xl w-6 h-6 flex items-center justify-center"></i>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Active Hotels</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.approvedHotels}</p>
-                <p className="text-xs text-yellow-600">{stats.pendingHotels} pending approval</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="bg-purple-100 rounded-lg p-3">
-                <i className="ri-calendar-check-line text-purple-600 text-xl w-6 h-6 flex items-center justify-center"></i>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Total Bookings</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalBookings.toLocaleString()}</p>
-                <p className="text-xs text-blue-600">All time</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="bg-yellow-100 rounded-lg p-3">
-                <i className="ri-money-dollar-circle-line text-yellow-600 text-xl w-6 h-6 flex items-center justify-center"></i>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">Platform Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">${stats.systemRevenue.toLocaleString()}</p>
-                <p className="text-xs text-green-600">10% commission</p>
-              </div>
+            <div className="mt-4 flex md:mt-0 md:ml-4">
+              <Link
+                href="/super-admin/system-settings"
+                className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <i className="ri-settings-3-line mr-2"></i>
+                System Settings
+              </Link>
             </div>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="flex">
-              {[
-                { id: 'overview', label: 'Overview', icon: 'ri-dashboard-line' },
-                { id: 'users', label: 'User Management', icon: 'ri-user-settings-line' },
-                { id: 'hotels', label: 'Hotel Control', icon: 'ri-hotel-line' },
-                { id: 'approvals', label: 'Approvals', icon: 'ri-check-double-line' },
-                { id: 'revenue', label: 'Revenue', icon: 'ri-line-chart-line' },
-                { id: 'settings', label: 'System Settings', icon: 'ri-settings-3-line' }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center px-6 py-3 text-sm font-medium whitespace-nowrap cursor-pointer border-b-2 ${
-                    activeTab === tab.id
-                      ? 'border-red-600 text-red-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <i className={`${tab.icon} mr-2 w-4 h-4 flex items-center justify-center`}></i>
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-
-          <div className="p-6">
-            {activeTab === 'overview' && (
-              <div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Recent Activity */}
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-                    <div className="space-y-3">
-                      {recentActivity.length > 0 ? (
-                        recentActivity.map(activity => (
-                          <div key={activity.id} className="bg-white rounded-lg p-4 border border-gray-200">
-                            <div className="flex items-start">
-                              <div className={`${getStatusColor(activity.status)} mr-3 mt-1`}>
-                                <i className={`${getActivityIcon(activity.type)} w-5 h-5 flex items-center justify-center`}></i>
-                              </div>
-                              <div className="flex-1">
-                                <p className="font-medium text-gray-900">{activity.message}</p>
-                                <p className="text-sm text-gray-600">{activity.user} • {activity.time}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-8 text-gray-500">
-                          <i className="ri-notification-off-line text-2xl mb-2"></i>
-                          <p>No recent activity</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Quick Actions */}
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-                    <div className="grid grid-cols-1 gap-3">
-                      <Link href="/super-admin/users" className="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-                        <div className="bg-blue-100 rounded-lg p-3 mr-4">
-                          <i className="ri-user-settings-line text-blue-600 w-5 h-5 flex items-center justify-center"></i>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Manage Users</p>
-                          <p className="text-sm text-gray-600">View and control all user accounts</p>
-                        </div>
-                      </Link>
-
-                      <Link href="/super-admin/hotel-approvals" className="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-                        <div className="bg-yellow-100 rounded-lg p-3 mr-4">
-                          <i className="ri-check-double-line text-yellow-600 w-5 h-5 flex items-center justify-center"></i>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Hotel Approvals</p>
-                          <p className="text-sm text-gray-600">{stats.pendingApprovals} pending approvals</p>
-                        </div>
-                      </Link>
-
-                      <Link href="/super-admin/revenue" className="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-                        <div className="bg-green-100 rounded-lg p-3 mr-4">
-                          <i className="ri-line-chart-line text-green-600 w-5 h-5 flex items-center justify-center"></i>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Revenue Analytics</p>
-                          <p className="text-sm text-gray-600">Platform earnings and commission</p>
-                        </div>
-                      </Link>
-
-                      <Link href="/super-admin/system-settings" className="flex items-center p-4 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-                        <div className="bg-purple-100 rounded-lg p-3 mr-4">
-                          <i className="ri-settings-3-line text-purple-600 w-5 h-5 flex items-center justify-center"></i>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">System Settings</p>
-                          <p className="text-sm text-gray-600">Configure platform settings</p>
-                        </div>
-                      </Link>
-                    </div>
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+          <div className="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
+                    <i className="ri-user-line text-blue-600"></i>
                   </div>
                 </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Users</dt>
+                    <dd className="text-lg font-medium text-gray-900">{stats.totalUsers.toLocaleString()}</dd>
+                    <dd className="text-xs text-green-600">+{stats.monthlyGrowth.toFixed(1)}% this month</dd>
+                  </dl>
+                </div>
               </div>
-            )}
+            </div>
+          </div>
 
-            {/* Other tab content remains the same */}
-            {/* ... (rest of the tab content) ... */}
+          <div className="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
+                    <i className="ri-hotel-line text-green-600"></i>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Active Hotels</dt>
+                    <dd className="text-lg font-medium text-gray-900">{stats.approvedHotels}</dd>
+                    <dd className="text-xs text-yellow-600">{stats.pendingHotels} pending</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
+                    <i className="ri-calendar-check-line text-purple-600"></i>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Bookings</dt>
+                    <dd className="text-lg font-medium text-gray-900">{stats.totalBookings.toLocaleString()}</dd>
+                    <dd className="text-xs text-blue-600">All time</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-yellow-100 rounded-md flex items-center justify-center">
+                    <i className="ri-money-dollar-circle-line text-yellow-600"></i>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Platform Revenue</dt>
+                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(stats.systemRevenue)}</dd>
+                    <dd className="text-xs text-green-600">10% commission</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Recent Activity */}
+          <div className="lg:col-span-2">
+            <div className="bg-white shadow-sm border border-gray-200 rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">System Activity</h3>
+                  <span className="text-sm text-gray-500">Last 24 hours</span>
+                </div>
+                
+                {recentActivity.length > 0 ? (
+                  <div className="flow-root">
+                    <ul className="-my-5 divide-y divide-gray-200">
+                      {recentActivity.map((activity) => (
+                        <li key={activity.id} className="py-4">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex-shrink-0">
+                              <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
+                                <i className={`${getActivityIcon(activity.type)} text-gray-600`}></i>
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {activity.message}
+                              </p>
+                              <p className="text-sm text-gray-500 truncate">
+                                {activity.user} • {activity.time}
+                              </p>
+                            </div>
+                            <div className="flex-shrink-0">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(activity.status)}`}>
+                                {activity.status}
+                              </span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <i className="ri-notification-off-line text-4xl text-gray-400 mb-2"></i>
+                    <h3 className="text-sm font-medium text-gray-900">No recent activity</h3>
+                    <p className="text-sm text-gray-500">System activity will appear here.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div>
+            <div className="bg-white shadow-sm border border-gray-200 rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Administrative Actions</h3>
+                <div className="space-y-3">
+                  <Link
+                    href="/super-admin/users"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <div className="flex items-center">
+                      <i className="ri-user-settings-line text-gray-400 mr-3"></i>
+                      User Management
+                    </div>
+                    <i className="ri-arrow-right-line text-gray-400"></i>
+                  </Link>
+
+                  <Link
+                    href="/super-admin/hotel-approvals"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <div className="flex items-center">
+                      <i className="ri-check-double-line text-gray-400 mr-3"></i>
+                      Hotel Approvals
+                      {stats.pendingApprovals > 0 && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          {stats.pendingApprovals}
+                        </span>
+                      )}
+                    </div>
+                    <i className="ri-arrow-right-line text-gray-400"></i>
+                  </Link>
+
+                  <Link
+                    href="/super-admin/hotels"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <div className="flex items-center">
+                      <i className="ri-hotel-line text-gray-400 mr-3"></i>
+                      Hotel Management
+                    </div>
+                    <i className="ri-arrow-right-line text-gray-400"></i>
+                  </Link>
+
+                  <Link
+                    href="/super-admin/revenue"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <div className="flex items-center">
+                      <i className="ri-line-chart-line text-gray-400 mr-3"></i>
+                      Revenue Analytics
+                    </div>
+                    <i className="ri-arrow-right-line text-gray-400"></i>
+                  </Link>
+
+                  <Link
+                    href="/super-admin/refund-requests"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <div className="flex items-center">
+                      <i className="ri-refund-line text-gray-400 mr-3"></i>
+                      Refund Management
+                    </div>
+                    <i className="ri-arrow-right-line text-gray-400"></i>
+                  </Link>
+
+                  <Link
+                    href="/super-admin/system-settings"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <div className="flex items-center">
+                      <i className="ri-settings-3-line text-gray-400 mr-3"></i>
+                      System Settings
+                    </div>
+                    <i className="ri-arrow-right-line text-gray-400"></i>
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* System Status */}
+            <div className="mt-6 bg-white shadow-sm border border-gray-200 rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">System Status</h3>
+                <dl className="space-y-3">
+                  <div className="flex justify-between">
+                    <dt className="text-sm font-medium text-gray-500">Active Users</dt>
+                    <dd className="text-sm text-gray-900">{stats.activeUsers}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-sm font-medium text-gray-500">Total Hotels</dt>
+                    <dd className="text-sm text-gray-900">{stats.totalHotels}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-sm font-medium text-gray-500">Total Revenue</dt>
+                    <dd className="text-sm text-gray-900">{formatCurrency(stats.totalRevenue)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-sm font-medium text-gray-500">Platform Health</dt>
+                    <dd className="text-sm text-green-600">Operational</dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <Footer />
     </div>
-  )
+  );
 }

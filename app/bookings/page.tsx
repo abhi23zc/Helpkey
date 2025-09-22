@@ -26,6 +26,17 @@ type BookingDoc = {
   createdAt?: any;
   hotelDetails?: { name?: string; location?: string; image?: string };
   roomDetails?: { type?: string; price?: number; size?: string; beds?: string; image?: string };
+  paymentInfo?: {
+    paymentId?: string;
+    method?: string;
+    status?: string;
+  };
+  refundInfo?: {
+    refundId?: string;
+    refundAmount?: number;
+    refundStatus?: string;
+    refundReason?: string;
+  };
 };
 
 function getStatusColor(status: string) {
@@ -221,7 +232,7 @@ export default function Bookings() {
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">Total Price</p>
-                        <p className="font-medium text-lg">${booking.totalAmount}</p>
+                        <p className="font-medium text-lg">₹{booking.totalAmount}</p>
                       </div>
                     </div>
 

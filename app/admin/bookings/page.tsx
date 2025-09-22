@@ -26,13 +26,13 @@ interface BookingData {
   unitPrice: number;
   status: 'confirmed' | 'completed' | 'cancelled' | 'pending' | string;
   createdAt?: any;
-  guestInfo?: {
+  guestInfo?: Array<{
     firstName?: string;
     lastName?: string;
     email?: string;
     phone?: string;
     specialRequests?: string;
-  };
+  }>;
   hotelDetails?: {
     name?: string;
     location?: string;
@@ -46,6 +46,7 @@ interface BookingData {
     beds?: string;
     image?: string;
     roomId?: string;
+    roomNumber?: string | null;
   };
   paymentInfo?: {
     cardholderName?: string;
@@ -64,6 +65,7 @@ export default function BookingManagement() {
   const [selectedHotel, setSelectedHotel] = useState('all');
   const [dateRange, setDateRange] = useState('all');
   const [bookings, setBookings] = useState<BookingData[]>([]);
+  const [refundRequests, setRefundRequests] = useState<{[key: string]: any}>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -96,6 +98,25 @@ export default function BookingManagement() {
         ...doc.data()
       } as BookingData));
       setBookings(bookingsData);
+      
+      // Fetch refund requests for all bookings
+      try {
+        const refundRequestsMap: {[key: string]: any} = {};
+        for (const booking of bookingsData) {
+          const refundQuery = query(
+            collection(db, 'refundRequests'),
+            where('bookingId', '==', booking.id)
+          );
+          const refundSnap = await getDocs(refundQuery);
+          if (!refundSnap.empty) {
+            const refundData = refundSnap.docs[0].data();
+            refundRequestsMap[booking.id] = { id: refundSnap.docs[0].id, ...refundData };
+          }
+        }
+        setRefundRequests(refundRequestsMap);
+      } catch (refundError) {
+        console.error('Error fetching refund requests:', refundError);
+      }
     } catch (err) {
       console.error('Error fetching bookings:', err);
       setError('Failed to load bookings. Please try again.');
@@ -127,11 +148,16 @@ export default function BookingManagement() {
 
 
   const filteredBookings = bookings.filter(booking => {
-    const guestName = `${booking.guestInfo?.firstName || ''} ${booking.guestInfo?.lastName || ''}`.trim();
+    // Get all guest names and emails from the array
+    const guestNames = booking.guestInfo?.map(guest => 
+      `${guest.firstName || ''} ${guest.lastName || ''}`.trim()
+    ).filter(Boolean) || [];
+    const guestEmails = booking.guestInfo?.map(guest => guest.email || '').filter(Boolean) || [];
+    
     const matchesSearch = booking.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         guestName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         guestNames.some(name => name.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          booking.hotelDetails?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         booking.guestInfo?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+                         guestEmails.some(email => email.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesStatus = selectedStatus === 'all' || booking.status.toLowerCase() === selectedStatus.toLowerCase();
     const matchesHotel = selectedHotel === 'all' || booking.hotelDetails?.name === selectedHotel;
@@ -273,7 +299,7 @@ export default function BookingManagement() {
               <div className="ml-3">
                 <p className="text-sm text-gray-600">Revenue</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  ${bookings.reduce((sum, b) => sum + (b.status.toLowerCase() === 'confirmed' || b.status.toLowerCase() === 'completed' ? b.totalAmount : 0), 0).toLocaleString()}
+                  ₹{bookings.reduce((sum, b) => sum + (b.status.toLowerCase() === 'confirmed' || b.status.toLowerCase() === 'completed' ? b.totalAmount : 0), 0).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -392,7 +418,9 @@ export default function BookingManagement() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredBookings.map(booking => {
-                    const guestName = `${booking.guestInfo?.firstName || ''} ${booking.guestInfo?.lastName || ''}`.trim();
+                    // Get primary guest (first guest in array) for display
+                    const primaryGuest = booking.guestInfo?.[0];
+                    const guestName = primaryGuest ? `${primaryGuest.firstName || ''} ${primaryGuest.lastName || ''}`.trim() : 'Guest';
                     const bookedDate = booking.createdAt ? 
                       (booking.createdAt.toDate ? booking.createdAt.toDate() : new Date(booking.createdAt)) : 
                       new Date();
@@ -404,13 +432,21 @@ export default function BookingManagement() {
                             <div className="text-sm font-medium text-gray-900">{booking.reference}</div>
                             <div className="text-sm text-gray-500">{booking.hotelDetails?.name || 'Hotel'}</div>
                             <div className="text-sm text-gray-500">{booking.roomDetails?.type || 'Room'}</div>
+                            {booking.roomDetails?.roomNumber && (
+                              <div className="text-xs text-blue-600 font-medium">Room: {booking.roomDetails.roomNumber}</div>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{guestName || 'Guest'}</div>
-                            <div className="text-sm text-gray-500">{booking.guestInfo?.email || ''}</div>
-                            <div className="text-sm text-gray-500">{booking.guestInfo?.phone || ''}</div>
+                            <div className="text-sm font-medium text-gray-900">{guestName}</div>
+                            <div className="text-sm text-gray-500">{primaryGuest?.email || ''}</div>
+                            <div className="text-sm text-gray-500">{primaryGuest?.phone || ''}</div>
+                            {booking.guestInfo && booking.guestInfo.length > 1 && (
+                              <div className="text-xs text-blue-600 mt-1">
+                                +{booking.guestInfo.length - 1} more guest{booking.guestInfo.length - 1 > 1 ? 's' : ''}
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -429,10 +465,26 @@ export default function BookingManagement() {
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(booking.status)}`}>
                               {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                             </span>
+                            {refundRequests[booking.id] && (
+                              <div className="flex items-center space-x-1">
+                                <i className="ri-refund-line text-orange-500 w-3 h-3 flex items-center justify-center"></i>
+                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                  refundRequests[booking.id].status === 'pending' 
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : refundRequests[booking.id].status === 'confirmed'
+                                    ? 'bg-green-100 text-green-800'
+                                    : refundRequests[booking.id].status === 'cancelled'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                  Refund {refundRequests[booking.id].status}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          ${booking.totalAmount?.toLocaleString() || '0'}
+                          ₹{booking.totalAmount?.toLocaleString() || '0'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                           <Link href={`/admin/bookings/${booking.id}`} className="text-blue-600 hover:text-blue-900 cursor-pointer">

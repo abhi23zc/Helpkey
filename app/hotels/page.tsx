@@ -2,19 +2,32 @@
 
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import HotelsMap from '@/components/HotelsMap';
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { db } from '@/config/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { useSearchParams } from 'next/navigation';
+
+interface Room {
+  id: string;
+  type: string;
+  price: number;
+  size: string;
+  beds: string;
+  capacity: number;
+  image: string | null;
+  amenities: string[];
+  originalPrice?: number;
+}
 
 interface HotelItem {
   id: string;
   name: string;
   location: string;
   address: string;
-  price: number;
-  originalPrice: number;
+  price: number; // This will be the minimum room price
+  originalPrice: number; // This will be the minimum original room price
   rating: number;
   reviews: number;
   stars: number;
@@ -25,6 +38,7 @@ interface HotelItem {
   description: string;
   email: string;
   phone: string;
+  rooms: Room[];
   policies: {
     cancellation?: string;
     checkIn?: string;
@@ -32,6 +46,9 @@ interface HotelItem {
     pets?: boolean;
     smoking?: boolean;
   };
+  latitude?: number;
+  longitude?: number;
+  distance?: number; // Distance from user's location in km
 }
 
 function getSafeString(val: any, fallback = 'N/A') {
@@ -77,15 +94,34 @@ function getSafePolicies(policies: any) {
   };
 }
 
+// Helper function to calculate distance between two coordinates
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Radius of the Earth in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c; // Distance in kilometers
+  return distance;
+}
+
 function HotelsContent() {
   const searchParams = useSearchParams();
   const searchLocation = searchParams.get('location') || '';
+  const lat = searchParams.get('lat');
+  const lng = searchParams.get('lng');
+  const radius = searchParams.get('radius');
+  const nearby = searchParams.get('nearby');
 
   const [hotels, setHotels] = useState<HotelItem[]>([]);
   const [allHotels, setAllHotels] = useState<HotelItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
+  const [maxPriceRange, setMaxPriceRange] = useState(2000);
   const [selectedStars, setSelectedStars] = useState<number[]>([]);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState('recommended');
@@ -97,16 +133,45 @@ function HotelsContent() {
         const hotelsCollectionRef = collection(db, 'hotels');
         const data = await getDocs(hotelsCollectionRef);
 
-        const fetchedHotels: HotelItem[] = data.docs
-          .map(doc => {
+        const fetchedHotels: HotelItem[] = await Promise.all(
+          data.docs.map(async (doc) => {
             const d = doc.data() as any;
+            
+            // Fetch rooms for this hotel
+            const roomsQuery = query(
+              collection(db, 'rooms'),
+              where('hotelId', '==', doc.id)
+            );
+            const roomsSnapshot = await getDocs(roomsQuery);
+            const rooms: Room[] = roomsSnapshot.docs.map(roomDoc => {
+              const roomData = roomDoc.data();
+              return {
+                id: roomDoc.id,
+                type: getSafeString(roomData.roomType, 'Standard Room'),
+                price: getSafeNumber(roomData.price, 0),
+                size: getSafeString(roomData.size, ''),
+                beds: getSafeString(roomData.beds, ''),
+                capacity: getSafeNumber(roomData.capacity, 2),
+                image: roomData.images?.[0] || null,
+                amenities: getSafeArray(roomData.amenities, []),
+                originalPrice: getSafeNumber(roomData.originalPrice, roomData.price || 0),
+              };
+            });
+
+            // Calculate minimum room prices
+            const roomPrices = rooms.map(room => room.price).filter(price => price > 0);
+            const roomOriginalPrices = rooms.map(room => room.originalPrice || room.price).filter(price => price > 0);
+            
+            const minPrice = roomPrices.length > 0 ? Math.min(...roomPrices) : getSafeNumber(d.price, 0);
+            const minOriginalPrice = roomOriginalPrices.length > 0 ? Math.min(...roomOriginalPrices) : getSafeNumber(d.originalPrice, d.price || 0);
+
             return {
               id: doc.id,
               name: getSafeString(d.name, 'Unnamed Hotel'),
               location: getSafeString(d.location, 'Unknown Location'),
               address: getSafeString(d.address, 'No address provided'),
-              price: getSafeNumber(d.price, 0),
-              originalPrice: getSafeNumber(d.originalPrice, d.price || 0),
+              price: minPrice,
+              originalPrice: minOriginalPrice,
               rating: getSafeNumber(d.rating, 4.2),
               reviews: getSafeNumber(d.reviews, Math.floor(Math.random() * 100) + 1),
               stars: getSafeNumber(d.stars, 3),
@@ -117,25 +182,67 @@ function HotelsContent() {
               description: getSafeString(d.description, 'No description available.'),
               email: getSafeString(d.email, ''),
               phone: getSafeString(d.phone, ''),
+              rooms: rooms,
               policies: getSafePolicies(d.policies),
+              latitude: d.latitude || d.lat,
+              longitude: d.longitude || d.lng,
             };
           })
-          .filter(hotel => hotel.approved === true && hotel.status === 'active');
+        );
 
-        setAllHotels(fetchedHotels);
+        const approvedHotels = fetchedHotels.filter(hotel => 
+          hotel.approved === true && 
+          hotel.status === 'active' && 
+          hotel.rooms.length > 0 // Only show hotels that have rooms
+        );
 
-        let filteredHotels = fetchedHotels;
+        // Update price range based on actual room prices
+        if (approvedHotels.length > 0) {
+          const maxPrice = Math.max(...approvedHotels.map(hotel => hotel.price));
+          const newMaxPrice = Math.ceil(maxPrice / 100) * 100; // Round up to nearest 100
+          setMaxPriceRange(newMaxPrice);
+          if (maxPrice > 2000) {
+            setPriceRange([0, newMaxPrice]);
+          }
+        }
 
-        if (searchLocation) {
+        setAllHotels(approvedHotels);
+
+        let filteredHotels = approvedHotels;
+
+        // Handle nearby search based on coordinates
+        if (nearby === 'true' && lat && lng) {
+          const userLat = parseFloat(lat);
+          const userLng = parseFloat(lng);
+          const searchRadiusKm = radius ? parseFloat(radius) : 10;
+
+          filteredHotels = approvedHotels
+            .filter(hotel => {
+              if (!hotel.latitude || !hotel.longitude) {
+                return false; // Skip hotels without coordinates
+              }
+              
+              const distance = calculateDistance(
+                userLat, userLng, 
+                hotel.latitude, hotel.longitude
+              );
+              
+              hotel.distance = distance; // Store distance for sorting
+              return distance <= searchRadiusKm;
+            })
+            .sort((a, b) => (a.distance || 0) - (b.distance || 0)); // Sort by distance
+        } 
+        // Handle text-based location search
+        else if (searchLocation) {
           const searchLower = searchLocation.toLowerCase();
-          filteredHotels = fetchedHotels.filter(hotel =>
+          filteredHotels = approvedHotels.filter(hotel =>
             hotel.location?.toLowerCase().includes(searchLower) ||
             hotel.address?.toLowerCase().includes(searchLower) ||
             hotel.name?.toLowerCase().includes(searchLower)
           );
         }
 
-        setHotels(filteredHotels.length > 0 ? filteredHotels : fetchedHotels);
+        setHotels(filteredHotels.length > 0 ? filteredHotels : approvedHotels);
 
         setLoading(false);
       } catch (error) {
@@ -145,7 +252,7 @@ function HotelsContent() {
     };
 
     fetchHotels();
-  }, [searchLocation]);
+  }, [searchLocation, lat, lng, radius, nearby]);
 
   // Filtering by price, stars, amenities
   useEffect(() => {
@@ -173,11 +280,14 @@ function HotelsContent() {
       filtered = [...filtered].sort((a, b) => b.price - a.price);
     } else if (sortBy === 'rating') {
       filtered = [...filtered].sort((a, b) => b.rating - a.rating);
+    } else if (sortBy === 'distance' && nearby === 'true') {
+      // Sort by distance for nearby searches
+      filtered = [...filtered].sort((a, b) => (a.distance || 0) - (b.distance || 0));
     }
-    // else recommended: keep as is
+    // else recommended: keep as is (or distance-based for nearby searches)
 
     setHotels(filtered);
-  }, [priceRange, selectedStars, selectedAmenities, sortBy, allHotels]);
+  }, [priceRange, selectedStars, selectedAmenities, sortBy, allHotels, nearby]);
 
   const handleStarFilter = (stars: number) => {
     setSelectedStars(prev =>
@@ -205,10 +315,13 @@ function HotelsContent() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                {searchLocation ? `Hotels in ${searchLocation}` : 'All Hotels'}
+                {nearby === 'true' ? 'Hotels Near You' : 
+                 searchLocation ? `Hotels in ${searchLocation}` : 'All Hotels'}
               </h1>
               <p className="text-gray-600">
-                {searchLocation ? `Searching for "${searchLocation}"` : 'Showing all available hotels'}
+                {nearby === 'true' ? 
+                  `Hotels within ${radius || 10} km of your location` :
+                  searchLocation ? `Searching for "${searchLocation}"` : 'Showing all available hotels'}
               </p>
             </div>
             <button
@@ -234,14 +347,14 @@ function HotelsContent() {
                 <input
                   type="range"
                   min="0"
-                  max="500"
+                  max={maxPriceRange}
                   value={priceRange[1]}
                   onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
                   className="w-full"
                 />
                 <div className="flex justify-between text-sm text-gray-600">
-                  <span>$0</span>
-                  <span>${priceRange[1]}</span>
+                  <span>₹0</span>
+                  <span>₹{priceRange[1]}</span>
                 </div>
               </div>
 
@@ -298,10 +411,15 @@ function HotelsContent() {
                     onChange={(e) => setSortBy(e.target.value)}
                     className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
                   >
-                    <option value="recommended">Recommended</option>
+                    <option value="recommended">
+                      {nearby === 'true' ? 'Distance (Closest First)' : 'Recommended'}
+                    </option>
                     <option value="price-low">Price: Low to High</option>
                     <option value="price-high">Price: High to Low</option>
                     <option value="rating">Guest Rating</option>
+                    {nearby === 'true' && (
+                      <option value="distance">Distance Only</option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -341,8 +459,16 @@ function HotelsContent() {
                           <p className="text-gray-600 flex items-center mb-3">
                             <i className="ri-map-pin-line mr-1 w-4 h-4 flex items-center justify-center"></i>
                             {hotel.location}
+                            {nearby === 'true' && hotel.distance && (
+                              <span className="ml-2 bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
+                                {hotel.distance.toFixed(1)} km away
+                              </span>
+                            )}
                           </p>
                           <p className="text-gray-500 text-sm mb-2">{hotel.address}</p>
+                          <p className="text-blue-600 text-sm font-medium mb-2">
+                            {hotel.rooms.length} room type{hotel.rooms.length !== 1 ? 's' : ''} available
+                          </p>
 
                         </div>
                         <div className="text-right">
@@ -351,10 +477,10 @@ function HotelsContent() {
                             <span className="ml-2 text-sm text-gray-600">({hotel.reviews} reviews)</span>
                           </div>
                           {hotel.originalPrice > hotel.price && (
-                            <span className="text-gray-400 line-through text-sm">${hotel.originalPrice}</span>
+                            <span className="text-gray-400 line-through text-sm">₹{hotel.originalPrice}</span>
                           )}
-                          <div className="text-2xl font-bold text-blue-600">${hotel.price}</div>
-                          <span className="text-sm text-gray-600">per night</span>
+                          <div className="text-2xl font-bold text-blue-600">₹{hotel.price}</div>
+                          <span className="text-sm text-gray-600">from per night</span>
                         </div>
                       </div>
 
@@ -398,6 +524,18 @@ function HotelsContent() {
                 </div>
               )}
             </div>
+
+            {/* Map Section */}
+            {!loading && hotels.length > 0 && (
+              <div className="mt-8">
+                <HotelsMap
+                  hotels={hotels}
+                  userLocation={nearby === 'true' && lat && lng ? { lat: parseFloat(lat), lng: parseFloat(lng) } : undefined}
+                  radius={radius ? parseFloat(radius) : undefined}
+                  className="w-full"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -9,6 +9,7 @@ import { db } from '@/config/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { uploadToCloudinary } from '@/utils/cloudinary';
+import GeocodingHelper from '@/components/GeocodingHelper';
 
 export default function AddHotel() {
   const router = useRouter();
@@ -24,8 +25,10 @@ export default function AddHotel() {
     email: '',
     stars: 3,
     description: '',
-    amenities: [],
-    images: [],
+    amenities: [] as string[],
+    images: [] as string[],
+    latitude: '',
+    longitude: '',
     policies: {
       checkIn: '15:00',
       checkOut: '11:00',
@@ -51,12 +54,21 @@ export default function AddHotel() {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'stars' ? parseInt(value) : value
     }));
   };
 
-  const handlePolicyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+  const handleCoordinatesFound = (latitude: number, longitude: number) => {
+    setFormData(prev => ({
+      ...prev,
+      latitude: latitude.toString(),
+      longitude: longitude.toString()
+    }));
+  };
+
+  const handlePolicyChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    const checked = 'checked' in e.target ? e.target.checked : false;
     setFormData(prev => ({
       ...prev,
       policies: {
@@ -205,6 +217,8 @@ export default function AddHotel() {
       // Add hotel data to Firestore
       const hotelData = {
         ...formData,
+        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         status: 'active',
@@ -347,6 +361,44 @@ export default function AddHotel() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Full address"
                 />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Coordinates (Optional)</label>
+                <p className="text-xs text-gray-500 mb-3">Add coordinates to enable location-based search for customers</p>
+                
+                <GeocodingHelper 
+                  onCoordinatesFound={handleCoordinatesFound}
+                  disabled={isSubmitting}
+                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Latitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      name="latitude"
+                      value={formData.latitude}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., 28.6139"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Longitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      name="longitude"
+                      value={formData.longitude}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., 77.2090"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>

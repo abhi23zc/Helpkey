@@ -290,7 +290,7 @@ export default function SuperAdminHotels() {
               <div className="ml-3">
                 <p className="text-sm text-gray-600">Commission</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  ${hotels.reduce((sum, h) => sum + h.commission, 0).toLocaleString()}
+                  ₹{hotels.reduce((sum, h) => sum + h.commission, 0).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -406,11 +406,11 @@ export default function SuperAdminHotels() {
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <p className="text-sm text-gray-500">Revenue</p>
-                    <p className="text-lg font-semibold text-green-600">${hotel.revenue.toLocaleString()}</p>
+                    <p className="text-lg font-semibold text-green-600">₹{hotel.revenue.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Commission</p>
-                    <p className="text-lg font-semibold text-blue-600">${hotel.commission.toLocaleString()}</p>
+                    <p className="text-lg font-semibold text-blue-600">₹{hotel.commission.toLocaleString()}</p>
                   </div>
                 </div>
 

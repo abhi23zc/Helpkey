@@ -100,7 +100,7 @@ export default function RevenueAnalytics() {
               </div>
               <div className="ml-4">
                 <p className="text-sm text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">${stats.totalRevenue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">₹{stats.totalRevenue.toLocaleString()}</p>
                 <p className="text-sm text-green-600">+{stats.yearlyGrowth}% yearly</p>
               </div>
             </div>
@@ -113,7 +113,7 @@ export default function RevenueAnalytics() {
               </div>
               <div className="ml-4">
                 <p className="text-sm text-gray-600">Platform Commission</p>
-                <p className="text-2xl font-bold text-gray-900">${stats.totalCommission.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">₹{stats.totalCommission.toLocaleString()}</p>
                 <p className="text-sm text-blue-600">10% average</p>
               </div>
             </div>
@@ -180,7 +180,7 @@ export default function RevenueAnalytics() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
+                <Tooltip formatter={(value) => [`₹${value.toLocaleString()}`, 'Revenue']} />
                 <Line type="monotone" dataKey="revenue" stroke="#3B82F6" strokeWidth={2} />
                 <Line type="monotone" dataKey="commission" stroke="#10B981" strokeWidth={2} />
               </LineChart>
@@ -227,7 +227,7 @@ export default function RevenueAnalytics() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
+              <Tooltip formatter={(value) => [`₹${value.toLocaleString()}`, 'Revenue']} />
               <Bar dataKey="revenue" fill="#3B82F6" />
               <Bar dataKey="commission" fill="#10B981" />
             </BarChart>
@@ -268,10 +268,10 @@ export default function RevenueAnalytics() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      ${hotel.revenue.toLocaleString()}
+                      ₹{hotel.revenue.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                      ${hotel.commission.toLocaleString()}
+                      ₹{hotel.commission.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {hotel.bookings}
