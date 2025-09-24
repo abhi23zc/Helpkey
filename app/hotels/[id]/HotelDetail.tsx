@@ -649,7 +649,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                           Total
                         </span>
                         <span className="text-lg font-bold text-blue-600">
-                          $
+                          ₹
                           {getTotalPrice() + Math.round(getTotalPrice() * 0.15)}
                         </span>
                       </div>

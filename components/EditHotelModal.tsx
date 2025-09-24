@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from '@/config/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadToCloudinary } from '@/utils/cloudinary';
+import MapLocationPicker from '@/components/MapLocationPicker';
 
 interface EditHotelModalProps {
   isOpen: boolean;
@@ -25,6 +26,8 @@ export default function EditHotelModal({ isOpen, onClose, hotelId }: EditHotelMo
     description: '',
     amenities: [] as string[],
     images: [] as string[],
+    latitude: '',
+    longitude: '',
     policies: {
       checkIn: '15:00',
       checkOut: '11:00',
@@ -71,6 +74,8 @@ export default function EditHotelModal({ isOpen, onClose, hotelId }: EditHotelMo
           description: hotelData.description || '',
           amenities: hotelData.amenities || [],
           images: hotelData.images || [],
+          latitude: hotelData.latitude ? hotelData.latitude.toString() : '',
+          longitude: hotelData.longitude ? hotelData.longitude.toString() : '',
           policies: {
             checkIn: hotelData.policies?.checkIn || '15:00',
             checkOut: hotelData.policies?.checkOut || '11:00',
@@ -92,7 +97,15 @@ export default function EditHotelModal({ isOpen, onClose, hotelId }: EditHotelMo
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'stars' ? parseInt(value) : value
+    }));
+  };
+
+  const handleCoordinatesFound = (latitude: number, longitude: number) => {
+    setFormData(prev => ({
+      ...prev,
+      latitude: latitude.toString(),
+      longitude: longitude.toString()
     }));
   };
 
@@ -245,6 +258,8 @@ export default function EditHotelModal({ isOpen, onClose, hotelId }: EditHotelMo
       const hotelRef = doc(db, 'hotels', hotelId);
       await updateDoc(hotelRef, {
         ...formData,
+        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         updatedAt: serverTimestamp()
       });
       
@@ -388,6 +403,46 @@ export default function EditHotelModal({ isOpen, onClose, hotelId }: EditHotelMo
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Coordinates (Optional)</label>
+                  <p className="text-xs text-gray-500 mb-3">Add coordinates to enable location-based search for customers</p>
+                  
+                  <MapLocationPicker 
+                    onCoordinatesFound={handleCoordinatesFound}
+                    disabled={isSubmitting}
+                    initialLatitude={formData.latitude}
+                    initialLongitude={formData.longitude}
+                  />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Latitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        name="latitude"
+                        value={formData.latitude}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., 28.6139"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Longitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        name="longitude"
+                        value={formData.longitude}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., 77.2090"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 

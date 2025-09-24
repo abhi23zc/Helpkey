@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useGoogleMaps } from '@/context/GoogleMapsContext';
 
 interface Hotel {
   id: string;
@@ -27,27 +28,7 @@ export default function HotelsMap({ hotels, userLocation, radius = 10, className
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  // Load Google Maps script
-  useEffect(() => {
-    const loadGoogleMaps = () => {
-      if (window.google && window.google.maps) {
-        setIsLoaded(true);
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => setIsLoaded(true);
-      script.onerror = () => console.error('Failed to load Google Maps');
-      document.head.appendChild(script);
-    };
-
-    loadGoogleMaps();
-  }, []);
+  const { isLoaded, loadError } = useGoogleMaps();
 
   // Initialize map
   useEffect(() => {
@@ -119,12 +100,15 @@ export default function HotelsMap({ hotels, userLocation, radius = 10, className
           icon: {
             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
               <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="16" cy="16" r="14" fill="#FF6B6B" stroke="#ffffff" stroke-width="2"/>
-                <text x="16" y="20" text-anchor="middle" fill="white" font-size="12" font-weight="bold">₹</text>
+                <g>
+                  <path d="M16 2C10.477 2 6 6.477 6 12c0 6.627 8.285 16.01 8.642 16.39a1 1 0 0 0 1.716 0C17.715 28.01 26 18.627 26 12c0-5.523-4.477-10-10-10zm0 13.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" fill="#FF6B6B" stroke="#fff" stroke-width="2"/>
+                  <circle cx="16" cy="12" r="3.5" fill="#fff" />
+                  <circle cx="16" cy="12" r="2" fill="#FF6B6B" />
+                </g>
               </svg>
             `),
             scaledSize: new google.maps.Size(32, 32),
-            anchor: new google.maps.Point(16, 16),
+            anchor: new google.maps.Point(16, 32),
           },
         });
 
@@ -182,6 +166,16 @@ export default function HotelsMap({ hotels, userLocation, radius = 10, className
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
           <p className="text-sm text-gray-600">Loading map...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className={`bg-red-50 rounded-lg flex items-center justify-center ${className}`}>
+        <div className="text-center">
+          <p className="text-sm text-red-600">Failed to load map: {loadError}</p>
         </div>
       </div>
     );

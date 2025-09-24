@@ -22,39 +22,37 @@ const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 /**
  * Get coordinates from an address using Google Maps Geocoding API
+ * Note: This requires Google Maps JavaScript SDK to be loaded
  */
 export async function geocodeAddress(address: string): Promise<GeocodingResult | null> {
   try {
-    if (!GOOGLE_MAPS_API_KEY) {
-      console.warn('Google Maps API key not found. Using fallback geocoding.');
+    if (!address.trim() || !window.google || !window.google.maps || !window.google.maps.geocoding) {
+      console.warn('Google Maps SDK not loaded. Using fallback geocoding.');
       return fallbackGeocodeAddress(address);
     }
 
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Geocoding API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.status === 'OK' && data.results.length > 0) {
-      const result = data.results[0];
-      return {
-        latitude: result.geometry.location.lat,
-        longitude: result.geometry.location.lng,
-        formatted_address: result.formatted_address,
-        place_id: result.place_id,
-        types: result.types,
-      };
-    } else if (data.status === 'ZERO_RESULTS') {
-      console.warn('No results found for address:', address);
-      return null;
-    } else {
-      throw new Error(`Geocoding API error: ${data.status}`);
-    }
+    return new Promise((resolve) => {
+      const geocoder = new window.google.maps.geocoding.Geocoder();
+      
+      geocoder.geocode(
+        { address: address },
+        (results, status) => {
+          if (status === 'OK' && results && results.length > 0) {
+            const result = results[0];
+            resolve({
+              latitude: result.geometry.location.lat(),
+              longitude: result.geometry.location.lng(),
+              formatted_address: result.formatted_address,
+              place_id: result.place_id,
+              types: result.types,
+            });
+          } else {
+            console.warn('Geocoding failed:', status);
+            resolve(fallbackGeocodeAddress(address));
+          }
+        }
+      );
+    });
   } catch (error) {
     console.error('Google Maps geocoding error:', error);
     // Fallback to mock data if API fails
@@ -93,32 +91,36 @@ function fallbackGeocodeAddress(address: string): GeocodingResult | null {
 
 /**
  * Get place autocomplete suggestions using Google Places API
+ * Note: This requires Google Maps JavaScript SDK to be loaded
  */
 export async function getPlaceAutocomplete(input: string): Promise<PlaceAutocompleteResult[]> {
   try {
-    if (!GOOGLE_MAPS_API_KEY || !input.trim()) {
+    if (!input.trim() || !window.google || !window.google.maps || !window.google.maps.places) {
       return [];
     }
 
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&types=geocode&key=${GOOGLE_MAPS_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Places API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.status === 'OK') {
-      return data.predictions.map((prediction: any) => ({
-        place_id: prediction.place_id,
-        description: prediction.description,
-        structured_formatting: prediction.structured_formatting,
-      }));
-    }
-
-    return [];
+    return new Promise((resolve) => {
+      const service = new window.google.maps.places.AutocompleteService();
+      
+      service.getPlacePredictions(
+        {
+          input: input,
+          types: ['geocode'],
+        },
+        (predictions, status) => {
+          if (status === 'OK' && predictions) {
+            const results = predictions.map((prediction) => ({
+              place_id: prediction.place_id,
+              description: prediction.description,
+              structured_formatting: prediction.structured_formatting,
+            }));
+            resolve(results);
+          } else {
+            resolve([]);
+          }
+        }
+      );
+    });
   } catch (error) {
     console.error('Google Places autocomplete error:', error);
     return [];
@@ -127,35 +129,38 @@ export async function getPlaceAutocomplete(input: string): Promise<PlaceAutocomp
 
 /**
  * Get place details using Google Places API
+ * Note: This requires Google Maps JavaScript SDK to be loaded
  */
 export async function getPlaceDetails(placeId: string): Promise<GeocodingResult | null> {
   try {
-    if (!GOOGLE_MAPS_API_KEY) {
+    if (!placeId || !window.google || !window.google.maps || !window.google.maps.places) {
       return null;
     }
 
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry,formatted_address,place_id,types&key=${GOOGLE_MAPS_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Place details API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.status === 'OK' && data.result) {
-      const result = data.result;
-      return {
-        latitude: result.geometry.location.lat,
-        longitude: result.geometry.location.lng,
-        formatted_address: result.formatted_address,
-        place_id: result.place_id,
-        types: result.types,
-      };
-    }
-
-    return null;
+    return new Promise((resolve) => {
+      const service = new window.google.maps.places.PlacesService(document.createElement('div'));
+      
+      service.getDetails(
+        {
+          placeId: placeId,
+          fields: ['geometry', 'formatted_address', 'place_id', 'types'],
+        },
+        (place, status) => {
+          if (status === 'OK' && place) {
+            const result = {
+              latitude: place.geometry?.location?.lat() || 0,
+              longitude: place.geometry?.location?.lng() || 0,
+              formatted_address: place.formatted_address || '',
+              place_id: place.place_id || '',
+              types: place.types || [],
+            };
+            resolve(result);
+          } else {
+            resolve(null);
+          }
+        }
+      );
+    });
   } catch (error) {
     console.error('Google Place details error:', error);
     return null;

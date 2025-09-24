@@ -9,7 +9,7 @@ import { db } from '@/config/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { uploadToCloudinary } from '@/utils/cloudinary';
-import GeocodingHelper from '@/components/GeocodingHelper';
+import MapLocationPicker from '@/components/MapLocationPicker';
 
 export default function AddHotel() {
   const router = useRouter();
@@ -367,9 +367,11 @@ export default function AddHotel() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Coordinates (Optional)</label>
                 <p className="text-xs text-gray-500 mb-3">Add coordinates to enable location-based search for customers</p>
                 
-                <GeocodingHelper 
+                <MapLocationPicker 
                   onCoordinatesFound={handleCoordinatesFound}
                   disabled={isSubmitting}
+                  initialLatitude={formData.latitude}
+                  initialLongitude={formData.longitude}
                 />
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">

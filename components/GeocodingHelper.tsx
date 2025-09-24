@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { geocodeAddress, getPlaceAutocomplete, getPlaceDetails } from '@/utils/geocoding';
+import { useGoogleMaps } from '@/context/GoogleMapsContext';
 import type { PlaceAutocompleteResult } from '@/utils/geocoding';
 
 interface GeocodingHelperProps {
@@ -18,6 +19,7 @@ export default function GeocodingHelper({ onCoordinatesFound, disabled = false }
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [isLoadingAutocomplete, setIsLoadingAutocomplete] = useState(false);
   const autocompleteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { isLoaded: isGoogleMapsLoaded, loadError } = useGoogleMaps();
 
   // Handle address input with autocomplete
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,7 +34,7 @@ export default function GeocodingHelper({ onCoordinatesFound, disabled = false }
     }
     
     autocompleteTimeoutRef.current = setTimeout(async () => {
-      if (value.trim().length >= 2) {
+      if (value.trim().length >= 2 && isGoogleMapsLoaded) {
         setIsLoadingAutocomplete(true);
         try {
           const results = await getPlaceAutocomplete(value);

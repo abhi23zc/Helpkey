@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getPlaceAutocomplete, getPlaceDetails, getCurrentLocation } from '@/utils/geocoding';
+import { useGoogleMaps } from '@/context/GoogleMapsContext';
 import type { PlaceAutocompleteResult } from '@/utils/geocoding';
 
 // Helper to format date as yyyy-mm-dd
@@ -27,6 +28,7 @@ export default function SearchForm() {
   const [rooms, setRooms] = useState('1');
   const [useCurrentLocation, setUseCurrentLocation] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [selectedPlaceCoordinates, setSelectedPlaceCoordinates] = useState<{lat: number, lng: number} | null>(null);
   const [searchRadius, setSearchRadius] = useState('10'); // in kilometers
   const [locationError, setLocationError] = useState('');
   const [isGettingLocation, setIsGettingLocation] = useState(false);
@@ -34,6 +36,7 @@ export default function SearchForm() {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [isLoadingAutocomplete, setIsLoadingAutocomplete] = useState(false);
   const autocompleteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { isLoaded: isGoogleMapsLoaded, loadError } = useGoogleMaps();
   const router = useRouter();
 
   // Ensure check-out is always at least 2 days after check-in
@@ -55,6 +58,7 @@ export default function SearchForm() {
       const location = await getCurrentLocation();
       setCurrentLocation({ lat: location.latitude, lng: location.longitude });
       setUseCurrentLocation(true);
+      setSelectedPlaceCoordinates(null); // Clear selected place coordinates when using current location
       setDestination(''); // Clear destination when using current location
       setShowAutocomplete(false); // Hide autocomplete
     } catch (error) {
@@ -72,6 +76,7 @@ export default function SearchForm() {
     if (value.trim()) {
       setUseCurrentLocation(false);
       setCurrentLocation(null);
+      setSelectedPlaceCoordinates(null); // Clear selected place coordinates when typing manually
       setLocationError('');
       
       // Debounce autocomplete requests
@@ -80,7 +85,7 @@ export default function SearchForm() {
       }
       
       autocompleteTimeoutRef.current = setTimeout(async () => {
-        if (value.trim().length >= 2) {
+        if (value.trim().length >= 2 && isGoogleMapsLoaded) {
           setIsLoadingAutocomplete(true);
           try {
             const results = await getPlaceAutocomplete(value);
@@ -113,7 +118,13 @@ export default function SearchForm() {
     try {
       const placeDetails = await getPlaceDetails(place.place_id);
       if (placeDetails) {
-        // You could optionally use these coordinates for more precise searching
+        // Store coordinates for nearby search
+        setSelectedPlaceCoordinates({
+          lat: placeDetails.latitude,
+          lng: placeDetails.longitude
+        });
+        setUseCurrentLocation(false); // Disable current location mode
+        setCurrentLocation(null); // Clear current location
         console.log('Selected place coordinates:', placeDetails);
       }
     } catch (error) {
@@ -141,8 +152,14 @@ export default function SearchForm() {
       params.append('lng', currentLocation.lng.toString());
       params.append('radius', searchRadius);
       params.append('nearby', 'true');
+    } else if (selectedPlaceCoordinates) {
+      // Use selected place coordinates for nearby search
+      params.append('lat', selectedPlaceCoordinates.lat.toString());
+      params.append('lng', selectedPlaceCoordinates.lng.toString());
+      params.append('radius', searchRadius);
+      params.append('nearby', 'true');
     } else if (destination.trim()) {
-      // Use destination search
+      // Use destination search (fallback to text-based search)
       params.append('location', destination.trim());
     }
     
@@ -188,7 +205,7 @@ export default function SearchForm() {
           
           {/* Autocomplete Dropdown */}
           {showAutocomplete && (autocompleteResults.length > 0 || isLoadingAutocomplete) && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            <div className=" absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 max-w-fit overflow-y-auto">
               {isLoadingAutocomplete ? (
                 <div className="p-3 text-center text-gray-500">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mx-auto"></div>
@@ -222,7 +239,7 @@ export default function SearchForm() {
           {locationError && (
             <p className="text-red-500 text-xs mt-1">{locationError}</p>
           )}
-          {useCurrentLocation && currentLocation && (
+          {(useCurrentLocation && currentLocation) || selectedPlaceCoordinates ? (
             <div className="mt-2 flex items-center space-x-2">
               <span className="text-xs text-gray-600">Search radius:</span>
               <select
@@ -236,8 +253,13 @@ export default function SearchForm() {
                 <option value="50">50 km</option>
                 <option value="100">100 km</option>
               </select>
+              {selectedPlaceCoordinates && (
+                <span className="text-xs text-green-600 ml-2">
+                  ✓ Location-based search enabled
+                </span>
+              )}
             </div>
-          )}
+          ) : null}
         </div>
 
         <div>
@@ -322,7 +344,12 @@ export default function SearchForm() {
           className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 whitespace-nowrap cursor-pointer"
         >
           <i className="ri-search-line w-5 h-5 flex items-center justify-center"></i>
-          <span>Search Hotels</span>
+          <span>
+            {(useCurrentLocation && currentLocation) || selectedPlaceCoordinates 
+              ? `Search Hotels Nearby (${searchRadius}km)` 
+              : 'Search Hotels'
+            }
+          </span>
         </button>
       </div>
     </div>

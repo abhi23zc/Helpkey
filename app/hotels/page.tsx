@@ -208,42 +208,6 @@ function HotelsContent() {
 
         setAllHotels(approvedHotels);
 
-        let filteredHotels = approvedHotels;
-
-        // Handle nearby search based on coordinates
-        if (nearby === 'true' && lat && lng) {
-          const userLat = parseFloat(lat);
-          const userLng = parseFloat(lng);
-          const searchRadiusKm = radius ? parseFloat(radius) : 10;
-
-          filteredHotels = approvedHotels
-            .filter(hotel => {
-              if (!hotel.latitude || !hotel.longitude) {
-                return false; // Skip hotels without coordinates
-              }
-              
-              const distance = calculateDistance(
-                userLat, userLng, 
-                hotel.latitude, hotel.longitude
-              );
-              
-              hotel.distance = distance; // Store distance for sorting
-              return distance <= searchRadiusKm;
-            })
-            .sort((a, b) => (a.distance || 0) - (b.distance || 0)); // Sort by distance
-        } 
-        // Handle text-based location search
-        else if (searchLocation) {
-          const searchLower = searchLocation.toLowerCase();
-          filteredHotels = approvedHotels.filter(hotel =>
-            hotel.location?.toLowerCase().includes(searchLower) ||
-            hotel.address?.toLowerCase().includes(searchLower) ||
-            hotel.name?.toLowerCase().includes(searchLower)
-          );
-        }
-
-        setHotels(filteredHotels.length > 0 ? filteredHotels : approvedHotels);
-
         setLoading(false);
       } catch (error) {
         console.error('Error fetching hotels:', error);
@@ -258,15 +222,36 @@ function HotelsContent() {
   useEffect(() => {
     let filtered = allHotels;
 
-    // Price filter
+    // Apply search filters first (location-based or text-based)
+    if (nearby === 'true' && lat && lng) {
+      const userLat = parseFloat(lat);
+      const userLng = parseFloat(lng);
+      const searchRadiusKm = radius ? parseFloat(radius) : 10;
+
+      filtered = filtered.filter(hotel => {
+        if (!hotel.latitude || !hotel.longitude) {
+          return false;
+        }
+        const distance = calculateDistance(userLat, userLng, hotel.latitude, hotel.longitude);
+        hotel.distance = distance;
+        return distance <= searchRadiusKm;
+      }).sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    } else if (searchLocation) {
+      const searchLower = searchLocation.toLowerCase();
+      filtered = filtered.filter(hotel =>
+        hotel.location?.toLowerCase().includes(searchLower) ||
+        hotel.address?.toLowerCase().includes(searchLower) ||
+        hotel.name?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Then apply price, stars, amenities filters
     filtered = filtered.filter(hotel => hotel.price >= priceRange[0] && hotel.price <= priceRange[1]);
 
-    // Star filter
     if (selectedStars.length > 0) {
       filtered = filtered.filter(hotel => selectedStars.includes(hotel.stars));
     }
 
-    // Amenities filter
     if (selectedAmenities.length > 0) {
       filtered = filtered.filter(hotel =>
         selectedAmenities.every(a => hotel.amenities.includes(a))
@@ -281,13 +266,11 @@ function HotelsContent() {
     } else if (sortBy === 'rating') {
       filtered = [...filtered].sort((a, b) => b.rating - a.rating);
     } else if (sortBy === 'distance' && nearby === 'true') {
-      // Sort by distance for nearby searches
       filtered = [...filtered].sort((a, b) => (a.distance || 0) - (b.distance || 0));
     }
-    // else recommended: keep as is (or distance-based for nearby searches)
 
     setHotels(filtered);
-  }, [priceRange, selectedStars, selectedAmenities, sortBy, allHotels, nearby]);
+  }, [priceRange, selectedStars, selectedAmenities, sortBy, allHotels, nearby, lat, lng, radius, searchLocation]);
 
   const handleStarFilter = (stars: number) => {
     setSelectedStars(prev =>
@@ -323,6 +306,11 @@ function HotelsContent() {
                   `Hotels within ${radius || 10} km of your location` :
                   searchLocation ? `Searching for "${searchLocation}"` : 'Showing all available hotels'}
               </p>
+              {nearby === 'true' && lat && lng && (
+                <div className="mt-2 text-sm text-blue-600">
+                   Searching from coordinates: {parseFloat(lat).toFixed(4)}, {parseFloat(lng).toFixed(4)}
+                </div>
+              )}
             </div>
             <button
               onClick={() => setFilterOpen(!filterOpen)}
@@ -430,6 +418,37 @@ function HotelsContent() {
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
                 <p className="mt-4 text-gray-600">Loading hotels...</p>
+              </div>
+            )}
+
+            {/* No Results Message */}
+            {!loading && hotels.length === 0 && (
+              <div className="text-center py-12">
+                {nearby === 'true' && lat && lng ? (
+                  <>
+                    <div className="text-6xl mb-4">🔍</div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No hotels found within {radius || 10} km</h3>
+                    <p className="text-gray-600 mb-4">
+                      We couldn't find any hotels within {radius || 10} km of your selected location.
+                    </p>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+                      <h4 className="font-semibold text-blue-900 mb-2">💡 Suggestions:</h4>
+                      <ul className="text-sm text-blue-800 text-left space-y-1">
+                        <li>• Try increasing the search radius</li>
+                        <li>• Search for a different location</li>
+                        <li>• Check if hotels in this area have location data</li>
+                      </ul>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-6xl mb-4">🏨</div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No hotels found</h3>
+                    <p className="text-gray-600">
+                      Try adjusting your search criteria or filters.
+                    </p>
+                  </>
+                )}
               </div>
             )}
 
