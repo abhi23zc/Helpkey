@@ -45,20 +45,17 @@ export default function Header() {
 
 
   return (
-    <header className={`bg-white shadow-sm sticky top-0 z-50 transition-all duration-300 ${
-      isScrolled ? 'shadow-lg backdrop-blur-sm bg-white/95' : 'shadow-sm'
-    }`}>
+    <header className={`bg-white shadow-sm sticky top-0 z-50${isScrolled ? ' shadow-md bg-white/95' : ''}`}>
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2 sm:py-3 flex items-center justify-between">
         {/* Logo */}
         <Link
           href="/"
-          className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-blue-600 tracking-tight flex items-center gap-2 transition-all duration-200 hover:scale-105 hover:text-blue-700"
+          className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-blue-700 tracking-tight flex items-center gap-1.5 hover:text-blue-800 focus:outline-none"
         >
-          <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm sm:text-base md:text-lg">H</span>
+          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 bg-blue-600 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-sm sm:text-base md:text-base">H</span>
           </div>
           <span className="inline-block">HelpKey</span>
-
         </Link>
 
         {/* Desktop Nav */}

@@ -383,7 +383,7 @@ export default function Home() {
       <section 
         className="relative min-h-screen bg-cover bg-center bg-no-repeat flex items-center"
         style={{
-          backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1920&q=80')`
+          backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://readdy.ai/api/search-image?query=Luxury%20hotel%20resort%20with%20palm%20trees%2C%20infinity%20pool%2C%20and%20pristine%20beach%20at%20sunset%2C%20tropical%20paradise%20destination%20with%20crystal%20clear%20water%20and%20white%20sand%2C%20modern%20architecture%20blending%20with%20natural%20beauty%2C%20serene%20atmosphere%20perfect%20for%20vacation%20getaway&width=1920&height=1080&seq=hero-hotel&orientation=landscape')`
         }}
       >
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
