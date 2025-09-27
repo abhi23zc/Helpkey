@@ -8,22 +8,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { getUserData } from '../utils/userUtils';
-
-interface UserData {
-  uid: string;
-  fullName: string;
-  email: string;
-  phoneNumber?: string;
-  photoURL?: string;
-  role: 'user' | 'admin';
-  isBanned: boolean;
-  idProofs?: {
-    aadhaar?: string;
-    pan?: string;
-  };
-  createdAt: any;
-  updatedAt: any;
-}
+import { UserData } from '../types/user';
 
 interface AuthContextType {
   user: User | null;

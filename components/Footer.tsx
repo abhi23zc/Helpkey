@@ -80,15 +80,15 @@ export default function Footer() {
             <div className="space-y-2">
               <p className="text-gray-400 flex items-center">
                 <i className="ri-phone-line mr-2 w-4 h-4 flex items-center justify-center"></i>
-                +1 (555) 123-4567
+                8354040412
               </p>
               <p className="text-gray-400 flex items-center">
                 <i className="ri-mail-line mr-2 w-4 h-4 flex items-center justify-center"></i>
-                info@Helpkey.com
+                helpkey@gmail.com
               </p>
               <p className="text-gray-400 flex items-center">
                 <i className="ri-map-pin-line mr-2 w-4 h-4 flex items-center justify-center"></i>
-                123 Travel Street, City, Country
+                Kanpur, India
               </p>
             </div>
           </div>

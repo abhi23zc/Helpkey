@@ -34,6 +34,21 @@ export const updateUserData = async (uid: string, data: any) => {
   }
 };
 
+// Function to update user profile picture
+export const updateUserProfilePicture = async (uid: string, photoURL: string) => {
+  try {
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      photoURL: photoURL,
+      updatedAt: new Date()
+    });
+    return true;
+  } catch (error) {
+    console.error('Error updating profile picture:', error);
+    return false;
+  }
+};
+
 // Function to update user ID proofs
 export const updateUserIdProofs = async (uid: string, proofType: 'aadhaar' | 'pan', url: string) => {
   try {

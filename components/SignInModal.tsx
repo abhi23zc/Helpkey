@@ -14,9 +14,10 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 interface SignInModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
+export default function SignInModal({ isOpen, onClose, onSuccess }: SignInModalProps) {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,11 +90,18 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
     try {
       await signInWithEmailAndPassword(auth, signInData.email, signInData.password);
+      setIsSubmitting(false);
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
-        window.location.reload();
+        if (onSuccess) {
+          console.log('Calling onSuccess callback for email sign in');
+          onSuccess();
+        } else {
+          console.log('No onSuccess callback, reloading page');
+          window.location.reload();
+        }
       }, 1500);
     } catch (error: any) {
       setError(error.message || 'Failed to sign in');
@@ -145,11 +153,18 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
         fullName: `${signUpData.firstName} ${signUpData.lastName}`,
         phone: signUpData.phone
       });
+      setIsSubmitting(false);
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
-        window.location.reload();
+        if (onSuccess) {
+          console.log('Calling onSuccess callback for sign up');
+          onSuccess();
+        } else {
+          console.log('No onSuccess callback, reloading page');
+          window.location.reload();
+        }
       }, 1500);
     } catch (error: any) {
       setError(error.message || 'Failed to create account');
@@ -169,11 +184,18 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
           fullName: result.user.displayName
         });
       }
+      setIsSubmitting(false);
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
-        window.location.reload();
+        if (onSuccess) {
+          console.log('Calling onSuccess callback for Google sign in');
+          onSuccess();
+        } else {
+          console.log('No onSuccess callback, reloading page');
+          window.location.reload();
+        }
       }, 1500);
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google');

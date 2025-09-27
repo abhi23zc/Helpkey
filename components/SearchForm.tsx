@@ -35,6 +35,7 @@ export default function SearchForm() {
   const [autocompleteResults, setAutocompleteResults] = useState<PlaceAutocompleteResult[]>([]);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [isLoadingAutocomplete, setIsLoadingAutocomplete] = useState(false);
+  const [isSearching, setIsSearching] = useState(false); // <-- New state for loading indicator
   const autocompleteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isLoaded: isGoogleMapsLoaded, loadError } = useGoogleMaps();
   const router = useRouter();
@@ -142,7 +143,9 @@ export default function SearchForm() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  // Modified handleSearch to show loading indicator
   const handleSearch = () => {
+    setIsSearching(true);
     // Pass all params in query string
     const params = new URLSearchParams();
     
@@ -168,11 +171,29 @@ export default function SearchForm() {
     if (guests) params.append('guests', guests);
     if (rooms) params.append('rooms', rooms);
 
+ 
     router.push(`/hotels${params.toString() ? '?' + params.toString() : ''}`);
+
   };
 
+  useEffect(() => {
+  
+    const handleRouteChange = () => setIsSearching(false);
+
+    return () => setIsSearching(false);
+  }, []);
+
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-6xl mx-auto">
+    <div className="bg-white rounded-lg shadow-lg p-6 mx-auto max-w-7xl ">
+      {/* Overlay loading indicator */}
+      {isSearching && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black bg-opacity-40">
+          <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mb-4"></div>
+            <span className="text-white text-lg font-semibold drop-shadow">Searching hotels...</span>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -205,7 +226,7 @@ export default function SearchForm() {
           
           {/* Autocomplete Dropdown */}
           {showAutocomplete && (autocompleteResults.length > 0 || isLoadingAutocomplete) && (
-            <div className=" absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 max-w-fit overflow-y-auto">
+            <div className=" absolute z-50 w-full mt-1 mr-3 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 max-w-fit overflow-y-auto">
               {isLoadingAutocomplete ? (
                 <div className="p-3 text-center text-gray-500">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mx-auto"></div>
@@ -342,14 +363,26 @@ export default function SearchForm() {
         <button
           onClick={handleSearch}
           className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 whitespace-nowrap cursor-pointer"
+          disabled={isSearching}
         >
-          <i className="ri-search-line w-5 h-5 flex items-center justify-center"></i>
-          <span>
-            {(useCurrentLocation && currentLocation) || selectedPlaceCoordinates 
-              ? `Search Hotels Nearby (${searchRadius}km)` 
-              : 'Search Hotels'
-            }
-          </span>
+          {isSearching ? (
+            <>
+              <i className="ri-loader-4-line w-5 h-5 flex items-center justify-center animate-spin"></i>
+              <span>
+                Searching...
+              </span>
+            </>
+          ) : (
+            <>
+              <i className="ri-search-line w-5 h-5 flex items-center justify-center"></i>
+              <span>
+                {(useCurrentLocation && currentLocation) || selectedPlaceCoordinates 
+                  ? `Search Hotels Nearby (${searchRadius}km)` 
+                  : 'Search Hotels'
+                }
+              </span>
+            </>
+          )}
         </button>
       </div>
     </div>

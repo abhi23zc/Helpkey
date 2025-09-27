@@ -2,11 +2,13 @@
 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import SignInModal from "@/components/SignInModal";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { db } from "@/config/firebase";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { useAuth } from "@/context/AuthContext";
 
 interface HotelDetailProps {
   hotelId: string;
@@ -31,7 +33,7 @@ interface Hotel {
   images: string[];
   stars: number;
   rating: number;
-  reviews: number;
+  reviews: string[];
   description: string;
   amenities: string[];
   rooms: Room[];
@@ -58,6 +60,7 @@ function getDateAfterNDaysString(n: number) {
 
 export default function HotelDetail({ hotelId }: HotelDetailProps) {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [hotel, setHotel] = useState<Hotel | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -68,6 +71,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
   const [customGuests, setCustomGuests] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [showSignInModal, setShowSignInModal] = useState(false);
 
   useEffect(() => {
     const fetchHotel = async () => {
@@ -111,7 +115,19 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
     fetchHotel();
   }, [hotelId, router]);
 
-  if (loading) {
+  // Auto-close modal when user becomes authenticated
+  useEffect(() => {
+    if (user && showSignInModal) {
+      console.log('User authenticated, closing modal and proceeding with booking');
+      setShowSignInModal(false);
+      // Small delay to ensure modal is closed before proceeding
+      setTimeout(() => {
+        handleBookNow();
+      }, 300);
+    }
+  }, [user, showSignInModal]);
+
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -174,9 +190,15 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
   const handleBookNow = () => {
     if (!selectedRoom) return;
 
+    // Check if user is authenticated
+    if (!user) {
+      setShowSignInModal(true);
+      return;
+    }
+
     const nights = calculateNights();
     const totalPrice = selectedRoom.price * nights;
-    const taxesAndFees = Math.round(totalPrice * 0.15);
+    const taxesAndFees = 0;
 
     const bookingParams = new URLSearchParams({
       hotel: hotel.id,
@@ -200,13 +222,32 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
   // Handler for "Select a Room" button in sidebar
   const handleSelectRoomClick = () => {
     setActiveTab("rooms");
-    // Optionally scroll to main content
+    // Scroll to the rooms section
     if (typeof window !== "undefined") {
-      const mainContent = document.getElementById("hotel-main-content");
-      if (mainContent) {
-        mainContent.scrollIntoView({ behavior: "smooth" });
-      }
+      setTimeout(() => {
+        const roomsSection = document.getElementById("rooms-section");
+        if (roomsSection) {
+          roomsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          // Fallback to main content if rooms section not found
+          const mainContent = document.getElementById("hotel-main-content");
+          if (mainContent) {
+            mainContent.scrollIntoView({ behavior: "smooth" });
+          }
+        }
+      }, 100); // Small delay to ensure tab content is rendered
     }
+  };
+
+  // Handle successful authentication - continue with booking
+  const handleSignInSuccess = () => {
+    console.log('Sign in success callback triggered');
+    setShowSignInModal(false);
+    // Small delay to ensure user state is updated
+    setTimeout(() => {
+      console.log('Attempting to book after sign in');
+      handleBookNow();
+    }, 500);
   };
 
   return (
@@ -215,8 +256,8 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
 
       {/* Hotel Images Gallery */}
       <div className="relative">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="lg:col-span-2 lg:row-span-2 h-[200px] sm:h-[300px] md:h-[400px] lg:h-[500px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2 h-[250px] sm:h-[300px] md:h-[400px] lg:h-[500px]">
             {hotel.images && hotel.images[0] ? (
               <img
                 src={hotel.images[0]}
@@ -226,16 +267,16 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
             ) : (
               <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
                 <div className="text-center text-gray-500">
-                  <i className="ri-image-line text-6xl mb-4 w-16 h-16 flex items-center justify-center mx-auto"></i>
-                  <p className="text-lg">No image available</p>
+                  <i className="ri-image-line text-4xl sm:text-6xl mb-2 sm:mb-4 w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto"></i>
+                  <p className="text-sm sm:text-lg">No image available</p>
                 </div>
               </div>
             )}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-2 lg:col-span-2">
+          <div className="grid grid-cols-2 sm:grid-cols-1 lg:grid-cols-2 gap-2 sm:col-span-2 lg:col-span-2">
             {hotel.images && hotel.images.length > 1 ? (
               hotel.images.slice(1).map((image: string, index: number) => (
-                <div key={index} className="h-[100px] sm:h-[145px] md:h-[195px] lg:h-[245px]">
+                <div key={index} className="h-[120px] sm:h-[145px] md:h-[195px] lg:h-[245px]">
                   <img
                     src={image}
                     alt={`${hotel.name} view ${index + 1}`}
@@ -244,8 +285,8 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                 </div>
               ))
             ) : (
-              <div className="col-span-2 h-[100px] sm:h-[145px] md:h-[195px] lg:h-[245px] bg-gray-100 rounded-lg flex items-center justify-center">
-                <p className="text-gray-500 text-sm">No additional images</p>
+              <div className="col-span-2 h-[120px] sm:h-[145px] md:h-[195px] lg:h-[245px] bg-gray-100 rounded-lg flex items-center justify-center">
+                <p className="text-gray-500 text-xs sm:text-sm">No additional images</p>
               </div>
             )}
           </div>
@@ -257,40 +298,37 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
           {/* Main Content */}
           <div className="lg:w-2/3" id="hotel-main-content">
             {/* Hotel Header */}
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4">
+                <div className="mb-4 sm:mb-0">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
                     {hotel.name}
                   </h1>
                   <div className="flex items-center mb-2">
                     {[...Array(hotel.stars)].map((_, i) => (
                       <i
                         key={i}
-                        className="ri-star-fill text-yellow-400 text-lg w-5 h-5 flex items-center justify-center"
+                        className="ri-star-fill text-yellow-400 text-base sm:text-lg w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center"
                       ></i>
                     ))}
-                    <span className="ml-2 text-gray-600">
+                    <span className="ml-2 text-sm sm:text-base text-gray-600">
                       {hotel.stars} stars
                     </span>
                   </div>
-                  <p className="text-gray-600 flex items-center">
+                  <p className="text-sm sm:text-base text-gray-600 flex items-center">
                     <i className="ri-map-pin-line mr-2 w-4 h-4 flex items-center justify-center"></i>
                     {hotel.location}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <div className="flex items-center mb-2">
-                    <span className="bg-blue-600 text-white px-3 py-1 rounded-lg text-lg font-semibold">
-                      {hotel.rating}
-                    </span>
-                    <span className="ml-2 text-gray-600">
-                      ({hotel.reviews} reviews)
+                    <span className="text-sm sm:text-base text-gray-600">
+                    {hotel?.reviews?.length && `${hotel?.reviews?.length} reviews`}
                     </span>
                   </div>
                 </div>
               </div>
-              <p className="text-gray-700 leading-relaxed">
+              <p className="text-sm sm:text-base text-gray-700 leading-relaxed">
                 {hotel.description}
               </p>
             </div>
@@ -298,7 +336,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
             {/* Tabs */}
             <div className="bg-white rounded-lg shadow-sm mb-6">
               <div className="border-b border-gray-200">
-                <nav className="flex">
+                <nav className="flex overflow-x-auto scrollbar-hide">
                   {[
                     { id: "overview", label: "Overview" },
                     { id: "rooms", label: "Rooms" },
@@ -308,7 +346,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap cursor-pointer border-b-2 ${
+                      className={`px-4 sm:px-6 py-3 text-sm font-medium whitespace-nowrap cursor-pointer border-b-2 flex-shrink-0 ${
                         activeTab === tab.id
                           ? "border-blue-600 text-blue-600"
                           : "border-transparent text-gray-500 hover:text-gray-700"
@@ -320,23 +358,23 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                 </nav>
               </div>
 
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 {activeTab === "overview" && (
                   <div>
-                    <h3 className="text-xl font-semibold mb-4">
+                    <h3 className="text-lg sm:text-xl font-semibold mb-4">
                       About This Hotel
                     </h3>
-                    <p className="text-gray-700 mb-6">{hotel.description}</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <p className="text-sm sm:text-base text-gray-700 mb-6">{hotel.description}</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div>
-                        <h4 className="font-semibold mb-2">
+                        <h4 className="font-semibold mb-2 text-sm sm:text-base">
                           Popular Amenities
                         </h4>
                         <ul className="space-y-1">
                           {hotel.amenities.slice(0, 5).map((amenity: string) => (
                             <li
                               key={amenity}
-                              className="flex items-center text-gray-700"
+                              className="flex items-center text-sm sm:text-base text-gray-700"
                             >
                               <i className="ri-check-line text-green-500 mr-2 w-4 h-4 flex items-center justify-center"></i>
                               {amenity}
@@ -345,10 +383,10 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                         </ul>
                       </div>
                       <div>
-                        <h4 className="font-semibold mb-2">
+                        <h4 className="font-semibold mb-2 text-sm sm:text-base">
                           Property Highlights
                         </h4>
-                        <ul className="space-y-1 text-gray-700">
+                        <ul className="space-y-1 text-sm sm:text-base text-gray-700">
                           <li>• Free cancellation available</li>
                           <li>• 24-hour front desk</li>
                           <li>• Mobile check-in</li>
@@ -361,60 +399,62 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                 )}
 
                 {activeTab === "rooms" && (
-                  <div>
-                    <h3 className="text-xl font-semibold mb-4">
+                  <div id="rooms-section" className="animate-fadeIn">
+                    <h3 className="text-lg sm:text-xl font-semibold mb-4">
                       Available Rooms
                     </h3>
                     <div className="space-y-4">
                       {hotel?.rooms?.map((room: Room) => (
                         <div
                           key={room.id}
-                          className="border border-gray-200 rounded-lg p-4"
+                          className="border border-gray-200 rounded-lg p-3 sm:p-4"
                         >
-                          <div className="flex flex-col md:flex-row gap-4">
-                            <div className="md:w-1/3">
+                          <div className="flex flex-col lg:flex-row gap-4">
+                            <div className="lg:w-1/3">
                               {room.image ? (
                                 <img
                                   src={room.image}
                                   alt={room.type}
-                                  className="w-full h-48 object-cover object-top rounded-lg"
+                                  className="w-full h-40 sm:h-48 object-cover object-top rounded-lg"
                                 />
                               ) : (
-                                <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <div className="w-full h-40 sm:h-48 bg-gray-200 rounded-lg flex items-center justify-center">
                                   <div className="text-center text-gray-500">
-                                    <i className="ri-image-line text-3xl mb-2 w-8 h-8 flex items-center justify-center mx-auto"></i>
-                                    <p className="text-sm">No image</p>
+                                    <i className="ri-image-line text-2xl sm:text-3xl mb-2 w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center mx-auto"></i>
+                                    <p className="text-xs sm:text-sm">No image</p>
                                   </div>
                                 </div>
                               )}
                             </div>
-                            <div className="md:w-2/3">
-                              <div className="flex justify-between items-start mb-2">
-                                <h4 className="text-lg font-semibold text-gray-900">
+                            <div className="lg:w-2/3">
+                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2">
+                                <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-0">
                                   {room.type}
                                 </h4>
-                                <div className="text-right">
-                                  <span className="text-gray-400 line-through text-sm">
-                                    ₹{room.originalPrice}
-                                  </span>
-                                  <div className="text-xl font-bold text-blue-600">
+                                <div className="text-left sm:text-right">
+                                  {room.originalPrice && (
+                                    <span className="text-gray-400 line-through text-sm">
+                                      ₹{room.originalPrice}
+                                    </span>
+                                  )}
+                                  <div className="text-lg sm:text-xl font-bold text-blue-600">
                                     ₹{room.price}
                                   </div>
-                                  <span className="text-sm text-gray-600">
+                                  <span className="text-xs sm:text-sm text-gray-600">
                                     per night
                                   </span>
                                 </div>
                               </div>
-                              <div className="flex items-center text-sm text-gray-600 mb-3">
-                                {room.size && <span className="mr-4">{room.size}</span>}
-                                {room.beds && <span className="mr-4">{room.beds}</span>}
+                              <div className="flex flex-col sm:flex-row sm:items-center text-xs sm:text-sm text-gray-600 mb-3">
+                                {room.size && <span className="mr-0 sm:mr-4 mb-1 sm:mb-0">{room.size}</span>}
+                                {room.beds && <span className="mr-0 sm:mr-4 mb-1 sm:mb-0">{room.beds}</span>}
                                 <span>Up to {room.capacity} guests</span>
                               </div>
-                              <div className="flex flex-wrap gap-2 mb-3">
+                              <div className="flex flex-wrap gap-1 sm:gap-2 mb-3">
                                 {room.amenities.map((amenity: string) => (
                                   <span
                                     key={amenity}
-                                    className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm"
+                                    className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs sm:text-sm"
                                   >
                                     {amenity}
                                   </span>
@@ -422,7 +462,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                               </div>
                               <button
                                 onClick={() => handleRoomSelect(room)}
-                                className={`px-4 py-2 rounded-lg cursor-pointer whitespace-nowrap ${
+                                className={`w-full sm:w-auto px-4 py-2 rounded-lg cursor-pointer whitespace-nowrap text-sm sm:text-base ${
                                   selectedRoom?.id === room.id
                                     ? "bg-blue-600 text-white"
                                     : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -442,17 +482,17 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
 
                 {activeTab === "amenities" && (
                   <div>
-                    <h3 className="text-xl font-semibold mb-4">
+                    <h3 className="text-lg sm:text-xl font-semibold mb-4">
                       Hotel Amenities
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                       {hotel.amenities.map((amenity: string) => (
                         <div
                           key={amenity}
                           className="flex items-center p-3 bg-gray-50 rounded-lg"
                         >
-                          <i className="ri-check-line text-green-500 mr-3 w-5 h-5 flex items-center justify-center"></i>
-                          <span className="text-gray-700">{amenity}</span>
+                          <i className="ri-check-line text-green-500 mr-2 sm:mr-3 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center"></i>
+                          <span className="text-sm sm:text-base text-gray-700">{amenity}</span>
                         </div>
                       ))}
                     </div>
@@ -461,7 +501,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
 
                 {activeTab === "reviews" && (
                   <div>
-                    <h3 className="text-xl font-semibold mb-4">
+                    <h3 className="text-lg sm:text-xl font-semibold mb-4">
                       Guest Reviews
                     </h3>
                     <div className="space-y-4">
@@ -492,25 +532,25 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                           key={index}
                           className="border-b border-gray-200 pb-4"
                         >
-                          <div className="flex justify-between items-start mb-2">
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2">
                             <div>
-                              <h5 className="font-semibold text-gray-900">
+                              <h5 className="font-semibold text-sm sm:text-base text-gray-900">
                                 {review.name}
                               </h5>
                               <div className="flex items-center">
                                 {[...Array(review.rating)].map((_, i) => (
                                   <i
                                     key={i}
-                                    className="ri-star-fill text-yellow-400 text-sm w-4 h-4 flex items-center justify-center"
+                                    className="ri-star-fill text-yellow-400 text-xs sm:text-sm w-3 h-3 sm:w-4 sm:h-4 flex items-center justify-center"
                                   ></i>
                                 ))}
-                                <span className="ml-2 text-sm text-gray-600">
+                                <span className="ml-2 text-xs sm:text-sm text-gray-600">
                                   {review.date}
                                 </span>
                               </div>
                             </div>
                           </div>
-                          <p className="text-gray-700">{review.review}</p>
+                          <p className="text-sm sm:text-base text-gray-700 mt-2">{review.review}</p>
                         </div>
                       ))}
                     </div>
@@ -522,12 +562,12 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
 
           {/* Booking Sidebar */}
           <div className="lg:w-1/3">
-            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
-              <h3 className="text-xl font-semibold mb-4">Book Your Stay</h3>
+            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 sticky top-4 sm:top-24">
+              <h3 className="text-lg sm:text-xl font-semibold mb-4">Book Your Stay</h3>
 
               {/* Date Selection */}
               <div className="space-y-4 mb-6">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Check-in
@@ -537,7 +577,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                       value={checkIn}
                       min={getTodayDateString()}
                       onChange={(e) => setCheckIn(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
@@ -549,7 +589,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                       value={checkOut}
                       min={checkIn}
                       onChange={(e) => setCheckOut(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
@@ -561,7 +601,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                   <select
                     value={showCustomInput ? 5 : guests}
                     onChange={(e) => handleGuestChange(parseInt(e.target.value))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
                   >
                     <option value={0}>Select number of guests</option>
                     <option value={1}>1 Guest</option>
@@ -586,7 +626,7 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                     value={customGuests}
                     onChange={(e) => handleCustomGuestChange(e.target.value)}
                     placeholder="Enter number of guests (5-20)"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <p className="text-xs text-blue-600 mt-1">
                     Please enter a number between 5 and 20 guests
@@ -599,26 +639,26 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                 <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <div className="flex items-center">
                     <i className="ri-information-line text-yellow-600 mr-2 w-4 h-4 flex items-center justify-center"></i>
-                    <span className="text-sm text-yellow-800">Please select the number of guests to continue</span>
+                    <span className="text-xs sm:text-sm text-yellow-800">Please select the number of guests to continue</span>
                   </div>
                 </div>
               )}
 
               {/* Selected Room */}
               {selectedRoom && (
-                <div className="border border-gray-200 rounded-lg p-4 mb-6">
-                  <h4 className="font-semibold text-gray-900 mb-2">
+                <div className="border border-gray-200 rounded-lg p-3 sm:p-4 mb-6">
+                  <h4 className="font-semibold text-sm sm:text-base text-gray-900 mb-2">
                     Selected Room
                   </h4>
-                  <p className="text-gray-700">{selectedRoom.type}</p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm sm:text-base text-gray-700">{selectedRoom.type}</p>
+                  <p className="text-xs sm:text-sm text-gray-600">
                     {[selectedRoom.size, selectedRoom.beds].filter(Boolean).join(' • ')}
                   </p>
                   <div className="flex justify-between items-center mt-2">
-                    <span className="text-lg font-bold text-blue-600">
+                    <span className="text-base sm:text-lg font-bold text-blue-600">
                       ₹{selectedRoom.price}
                     </span>
-                    <span className="text-sm text-gray-600">per night</span>
+                    <span className="text-xs sm:text-sm text-gray-600">per night</span>
                   </div>
                 </div>
               )}
@@ -626,29 +666,29 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
               {/* Price Summary */}
               <div className="border-t border-gray-200 pt-4 mb-6">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-600">Nights</span>
-                  <span className="text-gray-900">{calculateNights()}</span>
+                  <span className="text-sm text-gray-600">Nights</span>
+                  <span className="text-sm text-gray-900">{calculateNights()}</span>
                 </div>
                 {selectedRoom && (
                   <>
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-600">
+                      <span className="text-sm text-gray-600">
                         ₹{selectedRoom.price} x {calculateNights()} nights
                       </span>
-                      <span className="text-gray-900">₹{getTotalPrice()}</span>
+                      <span className="text-sm text-gray-900">₹{getTotalPrice()}</span>
                     </div>
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-600">Taxes & fees</span>
-                      <span className="text-gray-900">
+                      <span className="text-sm text-gray-600">Taxes & fees</span>
+                      <span className="text-sm text-gray-900">
                         ₹{Math.round(getTotalPrice() * 0.15)}
                       </span>
                     </div>
                     <div className="border-t border-gray-200 pt-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-lg font-semibold text-gray-900">
+                        <span className="text-base sm:text-lg font-semibold text-gray-900">
                           Total
                         </span>
-                        <span className="text-lg font-bold text-blue-600">
+                        <span className="text-base sm:text-lg font-bold text-blue-600">
                           ₹
                           {getTotalPrice() + Math.round(getTotalPrice() * 0.15)}
                         </span>
@@ -660,10 +700,12 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
 
               <button
                 onClick={selectedRoom ? handleBookNow : handleSelectRoomClick}
-                disabled={!selectedRoom || getFinalGuestCount() === 0}
-                className={`w-full py-3 rounded-lg font-medium whitespace-nowrap cursor-pointer ${
+                disabled={getFinalGuestCount() === 0}
+                className={`w-full py-3 rounded-lg font-medium whitespace-nowrap text-sm sm:text-base transition-colors duration-200 ${
                   selectedRoom && getFinalGuestCount() > 0
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    ? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                    : !selectedRoom && getFinalGuestCount() > 0
+                    ? "bg-blue-500 text-white hover:bg-blue-600 cursor-pointer"
                     : "bg-gray-400 text-white cursor-not-allowed"
                 }`}
               >
@@ -679,6 +721,16 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
       </div>
 
       <Footer />
+
+      {/* Sign In Modal */}
+      <SignInModal 
+        isOpen={showSignInModal} 
+        onClose={() => {
+          console.log('Modal closed manually');
+          setShowSignInModal(false);
+        }}
+        onSuccess={handleSignInSuccess}
+      />
     </div>
   );
 }
