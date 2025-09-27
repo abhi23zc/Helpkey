@@ -177,17 +177,17 @@ export default function BookingDetail({ bookingId }: BookingDetailProps) {
 					</div>
 
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-						<div className="text-center sm:text-left">
+						<div className="">
 							<p className="text-xs sm:text-sm text-gray-500">Check-in</p>
 							<p className="font-semibold text-base sm:text-lg break-words">{formatDate(booking.checkIn)}</p>
 							<p className="text-xs sm:text-sm text-gray-600">3:00 PM</p>
 						</div>
-						<div className="text-center sm:text-left">
+						<div className="">
 							<p className="text-xs sm:text-sm text-gray-500">Check-out</p>
 							<p className="font-semibold text-base sm:text-lg break-words">{formatDate(booking.checkOut)}</p>
 							<p className="text-xs sm:text-sm text-gray-600">11:00 AM</p>
 						</div>
-						<div className="text-center sm:text-left sm:col-span-2 lg:col-span-1">
+						<div className="">
 							<p className="text-xs sm:text-sm text-gray-500">Duration</p>
 							<p className="font-semibold text-base sm:text-lg">{calculateNights()} nights</p>
 							<p className="text-xs sm:text-sm text-gray-600">{booking.guests} guests, 1 room</p>

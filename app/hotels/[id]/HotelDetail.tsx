@@ -230,11 +230,11 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
           roomsSection.scrollIntoView({ behavior: "smooth", block: "start" });
         } else {
           // Fallback to main content if rooms section not found
-          const mainContent = document.getElementById("hotel-main-content");
-          if (mainContent) {
-            mainContent.scrollIntoView({ behavior: "smooth" });
-          }
-        }
+      const mainContent = document.getElementById("hotel-main-content");
+      if (mainContent) {
+        mainContent.scrollIntoView({ behavior: "smooth" });
+      }
+    }
       }, 100); // Small delay to ensure tab content is rendered
     }
   };
@@ -433,9 +433,9 @@ export default function HotelDetail({ hotelId }: HotelDetailProps) {
                                 </h4>
                                 <div className="text-left sm:text-right">
                                   {room.originalPrice && (
-                                    <span className="text-gray-400 line-through text-sm">
-                                      ₹{room.originalPrice}
-                                    </span>
+                                  <span className="text-gray-400 line-through text-sm">
+                                    ₹{room.originalPrice}
+                                  </span>
                                   )}
                                   <div className="text-lg sm:text-xl font-bold text-blue-600">
                                     ₹{room.price}

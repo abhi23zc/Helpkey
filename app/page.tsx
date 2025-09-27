@@ -85,6 +85,7 @@ export default function Home() {
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
   const [stats, setStats] = useState({
     totalHotels: 0,
     totalBookings: 0,
@@ -111,12 +112,24 @@ export default function Home() {
         },
         (error) => {
           console.log('Geolocation error:', error);
-          // Default to Delhi if location access denied
-          setUserLocation({ lat: 28.6139, lng: 77.2090 });
+          if (error.code === error.PERMISSION_DENIED) {
+            // User denied permission - show message
+            console.log('Location permission denied by user');
+            setLocationPermissionDenied(true);
+            // Don't set default location immediately - let user see the message
+          } else {
+            // Other errors (timeout, etc.) - use default
+            setUserLocation({ lat: 28.6139, lng: 77.2090 });
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
         }
       );
     } else {
-      // Default to Delhi if geolocation not supported
+      // Geolocation not supported - use default
       setUserLocation({ lat: 28.6139, lng: 77.2090 });
     }
   }, [mounted]);
@@ -317,6 +330,38 @@ export default function Home() {
     router.push(`/hotels?location=${encodeURIComponent(destination)}`);
   };
 
+  const retryLocationAccess = () => {
+    setLocationPermissionDenied(false);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setLocationPermissionDenied(false);
+        },
+        (error) => {
+          if (error.code === error.PERMISSION_DENIED) {
+            setLocationPermissionDenied(true);
+          } else {
+            setUserLocation({ lat: 28.6139, lng: 77.2090 });
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000
+        }
+      );
+    }
+  };
+
+  const useDefaultLocation = () => {
+    setUserLocation({ lat: 28.6139, lng: 77.2090 });
+    setLocationPermissionDenied(false);
+  };
+
   // Show loading during hydration
   if (!mounted) {
     return (
@@ -376,6 +421,48 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Location Permission Message */}
+      {locationPermissionDenied && (
+        <section className="py-8 bg-yellow-50 border-l-4 border-yellow-400">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">
+                    Location Access Required
+                  </h3>
+                  <div className="mt-2 text-sm text-yellow-700">
+                    <p>
+                      To show you nearby hotels, we need access to your location. 
+                      Please allow location access or use the default location.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={retryLocationAccess}
+                  className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-md text-sm font-medium hover:bg-yellow-200 transition-colors"
+                >
+                  Allow Location
+                </button>
+                <button
+                  onClick={useDefaultLocation}
+                  className="bg-yellow-600 text-white px-3 py-1 rounded-md text-sm font-medium hover:bg-yellow-700 transition-colors"
+                >
+                  Use Default
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Loading State */}
       {loading && (
@@ -543,7 +630,7 @@ export default function Home() {
       )}
 
       {/* Popular Destinations */}
-      <section className="py-12 sm:py-16 lg:py-20 bg-white">
+      {/* <section className="py-12 sm:py-16 lg:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 sm:mb-12 lg:mb-16">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
@@ -594,7 +681,7 @@ export default function Home() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Features Section */}
       <section className="py-12 sm:py-16 lg:py-20 bg-gray-50">
